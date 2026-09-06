@@ -27,6 +27,7 @@ __all__ = [
     "plot_enhancement_map",
     "plot_fixed_points",
     "plot_supersymmetry",
+    "plot_root_connectivity",
 ]
 
 _STYLE = {
@@ -412,4 +413,40 @@ def plot_supersymmetry(levels, bosonic_degeneracies, super_degeneracies, path) -
     ax2.set_ylabel(r"$\Delta \log d / \Delta \sqrt{N}$")
     ax2.set_title(r"The superstring's $\beta_H$ is smaller, so its $T_H$ is higher")
     ax2.legend(fontsize=8)
+    return _save(fig, path)
+
+
+def plot_root_connectivity(named_roots, path, title: str | None = None) -> Path:
+    r"""Which roots are non-orthogonal to which -- the thing that separates the algebras.
+
+    ``named_roots`` is a sequence of ``(label, roots)`` pairs.  Each panel shows
+    the matrix that is 1 where two roots have non-zero inner product, which is
+    precisely the graph
+    :func:`stringsim.compactification.torus.decompose_roots` takes connected
+    components of.  A root system that splits into orthogonal pieces shows
+    **blank off-diagonal blocks**; a connected one does not.
+
+    That is the honest picture for the two heterotic lattices: both have 480
+    roots of squared length 2, so nothing about their *size* distinguishes them,
+    and a projection to two dimensions shows only a shapeless cloud.  The block
+    structure is the difference, and it is visible here.
+    """
+    entries = list(named_roots)
+    if not entries:
+        raise ValueError("give at least one (label, roots) pair")
+    fig, axes = _fig(1, len(entries), figsize=(5.4 * len(entries), 5.2))
+    axes = np.atleast_1d(axes)
+    for ax, (label, roots) in zip(axes, entries, strict=True):
+        roots = np.asarray(roots, dtype=float)
+        gram = roots @ roots.T
+        adjacency = (np.abs(gram) > 1e-8).astype(float)
+        ax.imshow(adjacency, cmap="Blues", interpolation="nearest", vmin=0.0, vmax=1.4)
+        ax.set_title(label, fontsize=10)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.grid(False)
+    fig.suptitle(
+        title or "Non-orthogonal root pairs: blank blocks mean the algebra factorises",
+        fontsize=11,
+    )
     return _save(fig, path)
