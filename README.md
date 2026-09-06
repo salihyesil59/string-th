@@ -1,10 +1,15 @@
 # stringsim
 
-A simulation toolkit for the bosonic string. It solves the worldsheet equations
+A simulation toolkit for string theory. It solves the worldsheet equations
 numerically, counts the quantum states, identifies which particle each vibration
 is, and reproduces the classic results — the critical dimension, the Regge
-trajectory, T-duality, D-brane gauge symmetry and the Veneziano amplitude — as
-computed output rather than quoted facts.
+trajectory, T-duality, orbifold twisted sectors, the type II spectra and the two
+heterotic strings — as computed output rather than quoted facts.
+
+It starts with the bosonic string, where every step can be watched, and builds
+up: circle, torus, orbifold, superstring, heterotic. Each layer is required to
+reproduce the one below it — the torus at `d = 1` must give the circle module's
+spectrum state for state, and it is tested that way.
 
 The design rule throughout: **anything that can be checked two ways is checked
 two ways.** The mode expansion is validated against a finite-difference solution
@@ -16,7 +21,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 322 checks
+python -m pytest                          # 352 checks
 ```
 
 ---
@@ -398,7 +403,78 @@ action rather than a tension and is correctly refused.
 twelve bosons would, not twenty-four, so `beta_H = 2 pi sqrt(2) = 8.886` against
 the bosonic `4 pi = 12.566`.
 
-### 7. D-branes — `stringsim.branes`
+### 7. Heterotic strings: two theories, and only two — `stringsim.heterotic`
+
+A heterotic string is closed, and its two moving directions are *different
+theories*: right-movers are the superstring (`c_R = 15`), left-movers the
+bosonic string (`c_L = 26`). Ten left-moving directions are spacetime; the
+remaining
+
+```
+26 - 10 = 16
+```
+
+have nowhere to go, and modular invariance forces them onto a lattice that is
+**even** and **self-dual**. Such lattices exist only in dimensions divisible by
+8 — and 16 is on that list. Had the two critical dimensions differed by
+anything else there would be no heterotic string at all.
+
+In sixteen dimensions there are exactly two, so there are exactly two heterotic
+strings. Both are constructed here and checked from an explicit basis (found by
+integer elimination, so the determinant is exact):
+
+| lattice | roots | covolume | even | `dim G` | algebra |
+|---|---|---|---|---|---|
+| `E8 + E8` | 480 | 1 | yes | 496 | `e8 + e8` |
+| `D16+` | 480 | 1 | yes | 496 | `so(32)` |
+
+**They are genuinely hard to tell apart.** Rank 16 with 480 roots is `e8 + e8`
+*or* `so(32)`, and `identify_algebra(16, 480)` returns both rather than picking
+one. What separates them is connectivity: the `E8 + E8` roots split into two
+mutually orthogonal families of 240, the `D16+` roots form one connected system
+of 480. `decompose_roots` — written for the torus, reused unchanged — settles
+it, and `figures/heterotic_roots.png` is that distinction drawn as an adjacency
+matrix. (A two-dimensional projection of the roots was tried first and shows
+nothing: both are shapeless clouds.)
+
+**`D16` alone is not enough.** Its covolume is 2, so it is even but not
+self-dual. Adding the spinor coset `(1/2, ..., 1/2)` halves the covolume to 1.
+That vector has norm 4, so it is *not* a root and contributes no gauge boson —
+it only fixes self-duality, and it is why the group is `Spin(32)/Z_2` rather
+than `SO(32)`.
+
+**Level matching removes the tachyon, before GSO.** Each side has its own mass
+formula and a physical state must satisfy both:
+
+```
+alpha' M^2 / 4  =  N_L + p^2/2 - 1   =   N_R - a_R
+```
+
+The lattice is even, so `p^2` is even and the left side is always an *integer*,
+lowest value `-1`. The NS ground state on the right sits at `-1/2`. Neither has
+a partner, so the lightest matched state is exactly massless — and
+`level_matched_masses(gso=False)` returns the same answer as `gso=True`, which
+is the point.
+
+**And the gauge group is what the massless level happens to contain.** At zero
+mass the left side needs `N_L + p^2/2 = 1`: either one oscillator and no lattice
+momentum (24 states, 16 of them internal) or no oscillator and a root (480 of
+them). Sixteen Cartan directions plus 480 roots is **496 gauge bosons**. That
+number is separately what Green-Schwarz anomaly cancellation demands in ten
+dimensions. The lattice knows nothing about anomalies; two unrelated
+consistency conditions agreeing on 496 is why the construction was taken
+seriously.
+
+The full massless level is `504 x 16 = 8064` states: `128` of `N = 1`
+supergravity (the same graviton/`B`/dilaton/gravitino/dilatino reps as section
+6) plus `496 x 16 = 7936` gauge.
+
+**What is not proved here.** That there are *only* two even self-dual lattices
+in sixteen dimensions is a theorem, not something this code establishes. What
+the code shows is that both candidates satisfy every condition and that they are
+inequivalent.
+
+### 8. D-branes — `stringsim.branes`
 
 Tension `T_p = 1/((2 pi)^p g_s alpha'^{(p+1)/2})`. The single power of `1/g_s`
 is the point: heavy at weak coupling, light at strong coupling — unlike a field
@@ -421,7 +497,7 @@ a length:
 [0,1,2,3]   -> U(1) x U(1) x U(1) x U(1)   4
 ```
 
-### 8. Amplitudes — `stringsim.amplitudes`
+### 9. Amplitudes — `stringsim.amplitudes`
 
 The Veneziano amplitude `A(s,t) = B(-alpha(s), -alpha(t))`, `alpha(x) = 1 +
 alpha' x`, with three things checked numerically:
@@ -444,7 +520,7 @@ Everything is evaluated through `gammaln`/`gammasgn`, not `gamma`: at
 `s = -2000` the amplitude is far past what double precision can represent, and
 `veneziano_log_abs` is the only honest way to look at it.
 
-### 9. Figures and animations — `stringsim.viz`
+### 10. Figures and animations — `stringsim.viz`
 
 GIFs are written with matplotlib's Pillow writer, so no external binary is
 needed. `examples/` produces:
@@ -465,6 +541,7 @@ needed. `examples/` produces:
 | `fixed_points_z3.png`, `fixed_points_z4.png` | orbifold fixed points in the torus cell |
 | `orbifold_intercepts.png` | how twisting lowers `a_k` |
 | `supersymmetry.png` | equal boson and fermion counts, and the two Hagedorn slopes |
+| `heterotic_roots.png` | root connectivity: two blocks against one |
 | `brane_separation.png` | levels rising as branes separate |
 | `veneziano.png` | the amplitude and its poles |
 
@@ -482,6 +559,7 @@ python examples/06_amplitudes.py          # poles, residues, Regge, hard scatter
 python examples/07_torus.py               # Narain lattice, O(d,d;Z), root systems
 python examples/08_orbifold.py            # projection, twisted sectors, fixed points
 python examples/09_superstring.py         # NS and R, GSO, type IIA/IIB, which branes
+python examples/10_heterotic.py           # the two lattices, 496, and no tachyon
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -494,7 +572,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-322 checks, about 30 seconds. They are cross-checks rather than regression
+352 checks, about 40 seconds. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
@@ -521,6 +599,8 @@ wrong, not merely if the code changed. A representative sample:
   theta-function product, and the Ramond counting equals both;
 * the D-brane ranks are all even for IIA and all odd for IIB, and each list is
   closed under `p -> 6 - p`;
+* both heterotic lattices come out even, unimodular and 496-dimensional, and
+  `D16` without its spinor coset comes out even but *not* unimodular;
 * `U(N) -> U(k) x U(N-k)` never increases the number of massless vectors;
 * the Virasoro–Shapiro residues are stable under halving the offset, which is
   what "simple pole" means.
@@ -529,9 +609,6 @@ wrong, not merely if the code changed. A representative sample:
 
 ## What is deliberately not here
 
-* **Heterotic strings.** The pieces are all here — the ``E_8`` lattice is
-  already identified by `identify_algebra(8, 240)` and the superstring side is
-  implemented — but the asymmetric left/right construction is not.
 * **Superstring worldsheet *dynamics*.** The sectors, GSO and the type II
   spectra are computed, but there is no numerical evolution of the fermions to
   match what `classical/` does for the bosons.
@@ -566,6 +643,10 @@ wrong, not merely if the code changed. A representative sample:
 * F. Gliozzi, J. Scherk and D. Olive, *Supersymmetry, supergravity theories and
   the dual spinor model*, Nucl. Phys. B **122** (1977) 253.
 * J. Polchinski, *String Theory*, Vol. II, chapters 10-13.
+* D. Gross, J. Harvey, E. Martinec and R. Rohm, *Heterotic string*, Phys. Rev.
+  Lett. **54** (1985) 502.
+* J. H. Conway and N. J. A. Sloane, *Sphere Packings, Lattices and Groups*,
+  ch. 4 — the even self-dual lattices and their classification.
 
 ---
 

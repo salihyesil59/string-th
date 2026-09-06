@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "stringsim"
 version = "0.1.0"
-description = "Simulation toolkit for the bosonic string: worldsheet dynamics, spectrum, compactification, D-branes and amplitudes"
+description = "Simulation toolkit for string theory: worldsheet dynamics, spectra, compactification and orbifolds, superstrings and the two heterotic strings"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
@@ -13,9 +13,13 @@ authors = [{ name = "Salih Yesil", email = "salihyesil59@gmail.com" }]
 keywords = [
     "string theory",
     "bosonic string",
+    "superstring",
+    "heterotic string",
     "worldsheet",
     "Regge trajectory",
     "T-duality",
+    "orbifold",
+    "Narain lattice",
     "D-brane",
     "Veneziano",
 ]

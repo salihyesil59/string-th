@@ -184,3 +184,15 @@ def test_supersymmetry_plot(tmp_path):
         sector_degeneracies(Sector.NS, 30),
         tmp_path / "susy.png",
     ).exists()
+
+
+def test_root_connectivity_plot(tmp_path):
+    from stringsim.heterotic.lattice import d16_plus, e8_squared
+    from stringsim.viz.plots import plot_root_connectivity
+
+    assert plot_root_connectivity(
+        [("E8+E8", e8_squared().roots), ("D16+", d16_plus().roots)],
+        tmp_path / "connectivity.png",
+    ).exists()
+    with pytest.raises(ValueError):
+        plot_root_connectivity([], tmp_path / "empty.png")
