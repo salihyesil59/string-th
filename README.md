@@ -7,7 +7,11 @@ trajectory, T-duality, orbifold twisted sectors, the type II spectra and the two
 heterotic strings — as computed output rather than quoted facts.
 
 It starts with the bosonic string, where every step can be watched, and builds
-up: circle, torus, orbifold, superstring, heterotic, heterotic on a torus. Each
+up: circle, torus, orbifold, superstring, heterotic, heterotic on a torus. Both
+worldsheet fields are simulated -- the bosons obey a wave equation and are
+integrated with a leapfrog, the fermions obey a transport equation and are
+integrated with Lax-Wendroff, and the two sectors of the superstring come out of
+a single sign at the end of the string. Each
 layer is required to reproduce the one below it — the torus at `d = 1` must give
 the circle module's spectrum state for state, and it is tested that way.
 
@@ -21,7 +25,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 393 checks
+python -m pytest                          # 432 checks
 ```
 
 ---
@@ -403,6 +407,63 @@ action rather than a tension and is correctly refused.
 twelve bosons would, not twenty-four, so `beta_H = 2 pi sqrt(2) = 8.886` against
 the bosonic `4 pi = 12.566`.
 
+**The fermions are also simulated, not only counted** —
+`stringsim.superstring.worldsheet`. The Dirac equation in conformal gauge is
+first order, so `psi_-` and `psi_+` are rigid profiles sliding in opposite
+directions; all of the content is at the ends. Fold the open string open with
+`psi(sigma) = psi_-(sigma)` on `[0, pi]` and `eta psi_+(2 pi - sigma)` beyond,
+and the pair becomes **one** right-moving field on a circle of circumference
+`2 pi` with
+
+```
+psi(sigma + 2 pi) = eta psi(sigma)
+```
+
+which is the whole sector story in one line. Everything else is then measured on
+the grid rather than quoted:
+
+| measured from the evolution | NS (`eta = -1`) | R (`eta = +1`) |
+|---|---|---|
+| mode numbers that rebuild a snapshot | `1/2, 3/2, 5/2, ...` | `0, 1, 2, ...` |
+| rebuilt with the *other* sector's modes | error `1.1` | error `0.79` |
+| non-propagating (zero) mode | none | one, conserved to `1e-13` |
+| `psi(tau + 2 pi)` | `-psi(tau)`, so `4 pi` to return | `+psi(tau)` |
+
+The wrong sector's mode numbers are not a small error but a different vector
+space, which is why the second row is `O(1)` and not `O(h^2)`. The scheme is
+Lax-Wendroff: second order (error ratio `3.83, 3.97, 3.99` on halving) and an
+exact one-cell shift at Courant number 1, where a full run reproduces the
+analytic mode solution to `6e-16`.
+
+The closed string has two independent fields and therefore the four spin
+structures NS-NS, NS-R, R-NS, R-R — and a constant survives only where the field
+is periodic, so only Ramond sides carry zero modes.
+
+**Supersymmetry picks the sector, and the supercurrent is a constraint.** Under
+`delta psi_-+ = d_-+ X` with a constant parameter, Neumann data has
+`d_+ X = d_- X` at the ends, so the varied fermion satisfies `psi_+ = psi_-`
+at *both* — the Ramond condition. Running `classical/evolve.py` and this module
+on the same grid:
+
+```
+    n     R at 0    R at pi   NS at pi  max |d_+ G_-|
+   32   1.19e-03   1.19e-03   3.87e-01      3.893e-03
+   64   1.48e-04   1.48e-04   3.91e-01      1.076e-03  (/3.6)
+  128   1.39e-05   1.39e-05   3.95e-01      2.757e-04  (/3.9)
+  256   2.02e-06   2.02e-06   3.94e-01      6.924e-05  (/4.0)
+```
+
+The R residuals go to zero with the grid; the NS one sits at `0.4` and stays.
+The last column is the chirality of the supercurrent `G_- = psi_- . d_- X`, the
+fermionic counterpart of the Virasoro residual in section 1, falling by four
+each time.
+
+`psi` is evolved as a real commuting field. That is exact for the equation of
+motion, the boundary conditions, the mode numbers, the period doubling and
+`G_-`, which is bilinear in different fields. It is not the Grassmann field, so
+the fermion bilinear in `T_{++}` and the anticommutator algebra stay algebraic,
+in `rns.py`.
+
 ### 7. Heterotic strings: two theories, and only two — `stringsim.heterotic`
 
 A heterotic string is closed, and its two moving directions are *different
@@ -585,6 +646,7 @@ needed. `examples/` produces:
 | `supersymmetry.png` | equal boson and fermion counts, and the two Hagedorn slopes |
 | `heterotic_roots.png` | root connectivity: two blocks against one |
 | `wilson_breaking.png` | the same picture before and after a Wilson line |
+| `fermion_reflection.png` | a pulse bouncing: NS colours alternate, R do not |
 | `brane_separation.png` | levels rising as branes separate |
 | `veneziano.png` | the amplitude and its poles |
 
@@ -604,6 +666,7 @@ python examples/08_orbifold.py            # projection, twisted sectors, fixed p
 python examples/09_superstring.py         # NS and R, GSO, type IIA/IIB, which branes
 python examples/10_heterotic.py           # the two lattices, 496, and no tachyon
 python examples/11_heterotic_compactified.py   # Gamma_{16+d,d} and Wilson lines
+python examples/12_worldsheet_fermions.py      # fermion transport, reflection, sectors
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -616,7 +679,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-393 checks, about 45 seconds. They are cross-checks rather than regression
+432 checks, about 45 seconds. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
@@ -656,9 +719,11 @@ wrong, not merely if the code changed. A representative sample:
 
 ## What is deliberately not here
 
-* **Superstring worldsheet *dynamics*.** The sectors, GSO and the type II
-  spectra are computed, but there is no numerical evolution of the fermions to
-  match what `classical/` does for the bosons.
+* **Grassmann worldsheet fermions.** `superstring/worldsheet.py` evolves
+  `psi^mu` as a real commuting field, which is exact for the transport, the
+  boundary conditions, the mode numbers and the supercurrent, but cannot
+  represent the anticommutator algebra or the fermion bilinear in `T_{++}`.
+  Those stay algebraic.
 * **M-theory and branes beyond Dp.** M2/M5 branes, the eleven-dimensional
   picture and the DBI action are absent; `branes/` covers the tension, the
   stretched-string spectrum and the gauge group only.
