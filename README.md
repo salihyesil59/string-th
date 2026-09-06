@@ -7,9 +7,9 @@ trajectory, T-duality, orbifold twisted sectors, the type II spectra and the two
 heterotic strings — as computed output rather than quoted facts.
 
 It starts with the bosonic string, where every step can be watched, and builds
-up: circle, torus, orbifold, superstring, heterotic. Each layer is required to
-reproduce the one below it — the torus at `d = 1` must give the circle module's
-spectrum state for state, and it is tested that way.
+up: circle, torus, orbifold, superstring, heterotic, heterotic on a torus. Each
+layer is required to reproduce the one below it — the torus at `d = 1` must give
+the circle module's spectrum state for state, and it is tested that way.
 
 The design rule throughout: **anything that can be checked two ways is checked
 two ways.** The mode expansion is validated against a finite-difference solution
@@ -21,7 +21,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 352 checks
+python -m pytest                          # 393 checks
 ```
 
 ---
@@ -474,6 +474,48 @@ in sixteen dimensions is a theorem, not something this code establishes. What
 the code shows is that both candidates satisfy every condition and that they are
 inequivalent.
 
+**On a torus, the two constructions merge.** Compactify ``d`` more directions
+and the charge lattice becomes `Gamma_{16+d,d}` — the gauge lattice and the
+Narain lattice of section 4, side by side. What is new is a third kind of
+modulus: a **Wilson line** `A_i^I`, one gauge vector per compact direction, so
+
+```
+d(d+1)/2  +  d(d-1)/2  +  16d  =  d(d + 16)
+```
+
+moduli in all, the dimension of `O(16+d,d)/(O(16+d) x O(d))`. The gauge rank is
+`16 + 2d`. A Wilson line acts on charges as a shift `pi -> pi + A w` together
+with a compensating shift of the momentum, and that pair is an `O(16+d,d)`
+rotation — built by `wilson_boost` and verified to preserve the lattice form,
+since the shift on its own would spoil it and the cancellation is the point.
+
+**Wilson lines break the gauge group, by one condition.** A gauge boson needs
+`p_R = 0` and `p_L^2 = 2`. With no winding the first forces `n_i = A_i . pi`,
+and `n` is an integer, so a root survives only when `A_i . pi` is an integer:
+
+| lattice | Wilson line | roots | unbroken algebra |
+|---|---|---|---|
+| `E8 x E8` | `0` | 480 | `e8 + e8` |
+| `E8 x E8` | `(1, 0^7; 0^8)` | 352 | `e8 + so(16)` |
+| `E8 x E8` | `(1/2, 1/2, 0^6; 0^8)` | 368 | `e8 + e7 + su(2)` |
+| `E8 x E8` | `(1/3, 0^7; 0^8)` | 324 | `e8 + so(14) + u(1)` |
+| `Spin(32)/Z2` | `(1/2^8; 0^8)` | 224 | `so(16) + so(16)` |
+
+`A = (1/2^8; 0^8)` leaves `E8 x E8` untouched — every `E8` vector has even
+coordinate sum, so `A . pi` is always an integer — while the same Wilson line
+cuts `Spin(32)/Z2` in half. And shifting `A` by a lattice vector changes
+nothing, so Wilson lines are periodic, exactly as `B` is on the torus.
+
+**Both reductions are tested, not assumed.** At `d = 0` every root gives
+`(p_L^2, p_R^2) = (2, 0)` and the mass formula is the one in `spectrum.py`; at
+zero gauge charge and no Wilson line the compact part reproduces the torus
+module's momenta to `1e-14`.
+
+Not enumerated: extra massless vectors carrying winding, which enhance the group
+again at special radii. Finding those needs gauge charges of norm above 2, a
+search of a different size, and `unbroken_roots` says so rather than quietly
+returning a partial answer.
+
 ### 8. D-branes — `stringsim.branes`
 
 Tension `T_p = 1/((2 pi)^p g_s alpha'^{(p+1)/2})`. The single power of `1/g_s`
@@ -542,6 +584,7 @@ needed. `examples/` produces:
 | `orbifold_intercepts.png` | how twisting lowers `a_k` |
 | `supersymmetry.png` | equal boson and fermion counts, and the two Hagedorn slopes |
 | `heterotic_roots.png` | root connectivity: two blocks against one |
+| `wilson_breaking.png` | the same picture before and after a Wilson line |
 | `brane_separation.png` | levels rising as branes separate |
 | `veneziano.png` | the amplitude and its poles |
 
@@ -560,6 +603,7 @@ python examples/07_torus.py               # Narain lattice, O(d,d;Z), root syste
 python examples/08_orbifold.py            # projection, twisted sectors, fixed points
 python examples/09_superstring.py         # NS and R, GSO, type IIA/IIB, which branes
 python examples/10_heterotic.py           # the two lattices, 496, and no tachyon
+python examples/11_heterotic_compactified.py   # Gamma_{16+d,d} and Wilson lines
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -572,7 +616,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-352 checks, about 40 seconds. They are cross-checks rather than regression
+393 checks, about 45 seconds. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
@@ -601,6 +645,9 @@ wrong, not merely if the code changed. A representative sample:
   closed under `p -> 6 - p`;
 * both heterotic lattices come out even, unimodular and 496-dimensional, and
   `D16` without its spinor coset comes out even but *not* unimodular;
+* the Wilson-line boost preserves the lattice form for random `A` in every `d`,
+  and the compactified module reproduces both the `d = 0` heterotic spectrum and
+  the zero-charge torus momenta;
 * `U(N) -> U(k) x U(N-k)` never increases the number of massless vectors;
 * the Virasoro–Shapiro residues are stable under halving the offset, which is
   what "simple pole" means.
