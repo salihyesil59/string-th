@@ -26,6 +26,7 @@ __all__ = [
     "plot_root_system",
     "plot_enhancement_map",
     "plot_fixed_points",
+    "plot_supersymmetry",
 ]
 
 _STYLE = {
@@ -333,4 +334,82 @@ def plot_fixed_points(orbifold, path, sectors=(1,), title: str | None = None) ->
     ax.set_ylabel(r"$X^2 / \sqrt{\alpha'}$")
     ax.set_title(title or f"Fixed points of $T^2/Z_{{{orbifold.order}}}$")
     ax.legend(loc="upper right", fontsize=9)
+    return _save(fig, path)
+
+
+def plot_supersymmetry(levels, bosonic_degeneracies, super_degeneracies, path) -> Path:
+    r"""Boson and fermion counts level by level, and how fast each theory grows.
+
+    Left: the GSO-projected superstring's bosons and fermions as paired bars,
+    drawn side by side rather than stacked so that any inequality would show
+    rather than average away.  They are equal at every level, which is what
+    spacetime supersymmetry means for the spectrum.
+
+    Right: the **local slope** ``d(log d)/d(sqrt(N))`` for both theories, which
+    is the quantity that tends to ``beta_H``.  Plotting ``log d`` itself would
+    mislead: the superstring has *more* states at low level (256 against 24 at
+    ``N = 1``), so its curve sits higher even though it grows more slowly.  The
+    slope separates the two claims, and the horizontal lines are the asymptotes
+    ``4 pi`` and ``2 pi sqrt(2)``, not fits.
+
+    ``levels`` is a short list of :class:`~stringsim.superstring.rns.SuperLevel`
+    for the bars; the two degeneracy lists should run as far as convenient, since
+    the slope approaches its limit only like ``1/sqrt(N)``.
+    """
+    fig, (ax, ax2) = _fig(1, 2, figsize=(11.0, 4.4))
+
+    index = np.arange(len(levels))
+    width = 0.38
+    ax.bar(
+        index - width / 2,
+        [level.bosons for level in levels],
+        width,
+        label="bosons (NS)",
+        color="tab:blue",
+    )
+    ax.bar(
+        index + width / 2,
+        [level.fermions for level in levels],
+        width,
+        label="fermions (R)",
+        color="tab:orange",
+    )
+    ax.set_yscale("log")
+    ax.set_xticks(index)
+    ax.set_xticklabels([f"{level.alpha_m2:.0f}" for level in levels])
+    ax.set_xlabel(r"$\alpha' M^2$")
+    ax.set_ylabel("states")
+    ax.set_title("Equal at every level: spacetime supersymmetry")
+    ax.legend()
+
+    def local_slope(degeneracies):
+        n = np.arange(1, len(degeneracies))
+        logd = np.array([math.log(d) for d in degeneracies[1:]])
+        mass = np.sqrt(n)
+        return n[:-1], np.diff(logd) / np.diff(mass)
+
+    for degeneracies, colour, label, asymptote, name in (
+        (bosonic_degeneracies, "tab:red", "bosonic", 4.0 * math.pi, r"$4\pi$"),
+        (
+            super_degeneracies,
+            "tab:blue",
+            "superstring",
+            2.0 * math.pi * math.sqrt(2.0),
+            r"$2\pi\sqrt{2}$",
+        ),
+    ):
+        n, slope = local_slope(degeneracies)
+        keep = n >= 4
+        ax2.plot(1.0 / np.sqrt(n[keep]), slope[keep], ".", ms=4, color=colour, label=label)
+        ax2.axhline(
+            asymptote,
+            color=colour,
+            ls="--",
+            lw=1.1,
+            label=f"{name} = {asymptote:.3f}",
+        )
+    ax2.set_xlabel(r"$1/\sqrt{N}$   (asymptotic limit at the left edge)")
+    ax2.set_ylabel(r"$\Delta \log d / \Delta \sqrt{N}$")
+    ax2.set_title(r"The superstring's $\beta_H$ is smaller, so its $T_H$ is higher")
+    ax2.legend(fontsize=8)
     return _save(fig, path)

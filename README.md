@@ -16,7 +16,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 286 checks
+python -m pytest                          # 322 checks
 ```
 
 ---
@@ -325,7 +325,80 @@ state: `a_k` never lands on the level lattice, so every twisted level is either
 tachyonic or massive. The bosonic string keeps its instability, and the
 quotient does not cure it.
 
-### 6. D-branes — `stringsim.branes`
+### 6. The superstring: worldsheet fermions and GSO — `stringsim.superstring`
+
+Give each boson `X^mu` a fermionic partner `psi^mu` and three things change at
+once.
+
+**Two sectors.** Nothing forces the worldsheet fermion to come back to itself
+around the string, so it may be antiperiodic (Neveu-Schwarz, half-integer modes)
+or periodic (Ramond, **integer modes including a zero mode**). Those zero modes
+obey a Clifford algebra, which forces the R ground state to be a spinor. That is
+where spacetime fermions come from at all.
+
+**The ground-state energies follow, and are measured.** A fermion contributes
+`-(1/2) zeta(-1, phi)` where a boson contributes `+(1/2) zeta(-1, phi)`, and
+`regularised_shifted_sum` supplies both:
+
+```
+a_NS = (D-2)/16 = 1/2,        a_R = 0        (D = 10)
+```
+
+so `alpha' M^2 = N - 1/2` in NS and `alpha' M^2 = N` in R. **The Ramond ground
+state comes out massless with nothing put in.** The NS ground state is a tachyon
+at `-1/2` — half as deep as the bosonic string's — and the projection is what
+removes it.
+
+**GSO, by explicit enumeration.** Keeping odd worldsheet fermion number deletes
+the NS tachyon and leaves `b_{-1/2}^i|0>`, eight states, a massless vector.
+Keeping one chirality in R leaves eight there too. The counting is done by
+multiplying out the oscillator products and tracking parity — an entirely
+different route from the theta-function ratio in `quantum/partition.py` — and
+the two are required to agree:
+
+```
+8, 128, 1152, 7680, 42112, 200448, 855552      (NS, enumerated)
+8, 128, 1152, 7680, 42112, 200448, 855552      (R,  enumerated)
+8, 128, 1152, 7680, 42112, 200448, 855552      (theta-function product)
+```
+
+Equal bosons and fermions at every mass level is the concrete form of
+`theta_3^4 = theta_2^4 + theta_4^4`, which section 2 proves as an identity.
+`supersymmetry_deficit` returns zeros.
+
+**Type IIA and IIB.** Two sets of fermions means four sectors, and the only
+difference between the theories is whether the two Ramond spinors have the same
+chirality:
+
+| sector | content | IIA | IIB |
+|---|---|---|---|
+| NS-NS | graviton 35, `B` 28, dilaton 1 | same | same |
+| R-R | | `C_1` 8, `C_3` 56 | `C_0` 1, `C_2` 28, self-dual `C_4` 35 |
+| NS-R, R-NS | gravitino 56, dilatino 8 | same | same |
+
+64 states each, 128 bosons and 128 fermions in both. Every dimension is a
+binomial coefficient computed on the spot, self-duality included — which is why
+`C_4` contributes 35 and not 70.
+
+**And that decides the branes.** A `Dp`-brane couples to `C_{p+1}`, whose dual
+is `C_{7-p}`, the potential of a `D(6-p)`-brane. Closing the RR ranks under
+`p -> 6 - p` gives
+
+```
+IIA:  p = 0, 2, 4, 6        IIB:  p = -1, 1, 3, 5, 7
+```
+
+even for IIA and odd for IIB, which `stable_brane_ranks` derives rather than
+tabulates — and a test asserts the parity, because getting the dual off by one
+gives a plausible-looking wrong list. Feed the result to section 7's
+`dp_brane_tension` for the masses; `p = -1` is the D-instanton, which has an
+action rather than a tension and is correctly refused.
+
+**The superstring runs hotter.** Eight bosons and eight fermions grow like
+twelve bosons would, not twenty-four, so `beta_H = 2 pi sqrt(2) = 8.886` against
+the bosonic `4 pi = 12.566`.
+
+### 7. D-branes — `stringsim.branes`
 
 Tension `T_p = 1/((2 pi)^p g_s alpha'^{(p+1)/2})`. The single power of `1/g_s`
 is the point: heavy at weak coupling, light at strong coupling — unlike a field
@@ -348,7 +421,7 @@ a length:
 [0,1,2,3]   -> U(1) x U(1) x U(1) x U(1)   4
 ```
 
-### 7. Amplitudes — `stringsim.amplitudes`
+### 8. Amplitudes — `stringsim.amplitudes`
 
 The Veneziano amplitude `A(s,t) = B(-alpha(s), -alpha(t))`, `alpha(x) = 1 +
 alpha' x`, with three things checked numerically:
@@ -371,7 +444,7 @@ Everything is evaluated through `gammaln`/`gammasgn`, not `gamma`: at
 `s = -2000` the amplitude is far past what double precision can represent, and
 `veneziano_log_abs` is the only honest way to look at it.
 
-### 8. Figures and animations — `stringsim.viz`
+### 9. Figures and animations — `stringsim.viz`
 
 GIFs are written with matplotlib's Pillow writer, so no external binary is
 needed. `examples/` produces:
@@ -391,6 +464,7 @@ needed. `examples/` produces:
 | `torus_enhancement.png` | where in the `T^2` moduli space the symmetry grows |
 | `fixed_points_z3.png`, `fixed_points_z4.png` | orbifold fixed points in the torus cell |
 | `orbifold_intercepts.png` | how twisting lowers `a_k` |
+| `supersymmetry.png` | equal boson and fermion counts, and the two Hagedorn slopes |
 | `brane_separation.png` | levels rising as branes separate |
 | `veneziano.png` | the amplitude and its poles |
 
@@ -407,6 +481,7 @@ python examples/05_dbranes.py             # tensions, stretched strings, U(N)
 python examples/06_amplitudes.py          # poles, residues, Regge, hard scattering
 python examples/07_torus.py               # Narain lattice, O(d,d;Z), root systems
 python examples/08_orbifold.py            # projection, twisted sectors, fixed points
+python examples/09_superstring.py         # NS and R, GSO, type IIA/IIB, which branes
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -419,7 +494,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-286 checks, about 30 seconds. They are cross-checks rather than regression
+322 checks, about 30 seconds. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
@@ -442,6 +517,10 @@ wrong, not merely if the code changed. A representative sample:
   sums, and the character projector matches index counting, for every orbifold;
 * the projected state count is a non-negative integer at every level — which is
   precisely what a sign or conjugation slip in the character sum would break;
+* the NS degeneracies counted by explicit enumeration equal the ones from the
+  theta-function product, and the Ramond counting equals both;
+* the D-brane ranks are all even for IIA and all odd for IIB, and each list is
+  closed under `p -> 6 - p`;
 * `U(N) -> U(k) x U(N-k)` never increases the number of massless vectors;
 * the Virasoro–Shapiro residues are stable under halving the offset, which is
   what "simple pole" means.
@@ -450,9 +529,12 @@ wrong, not merely if the code changed. A representative sample:
 
 ## What is deliberately not here
 
-* **Superstring worldsheet dynamics.** The GSO counting, the critical dimension
-  and the Jacobi identity are implemented, but the RNS fermions themselves are
-  not simulated.
+* **Heterotic strings.** The pieces are all here — the ``E_8`` lattice is
+  already identified by `identify_algebra(8, 240)` and the superstring side is
+  implemented — but the asymmetric left/right construction is not.
+* **Superstring worldsheet *dynamics*.** The sectors, GSO and the type II
+  spectra are computed, but there is no numerical evolution of the fermions to
+  match what `classical/` does for the bosons.
 * **M-theory and branes beyond Dp.** M2/M5 branes, the eleven-dimensional
   picture and the DBI action are absent; `branes/` covers the tension, the
   stretched-string spectrum and the gauge group only.
@@ -481,6 +563,9 @@ wrong, not merely if the code changed. A representative sample:
   theory*, Phys. Rept. **244** (1994) 77.
 * L. Dixon, J. Harvey, C. Vafa and E. Witten, *Strings on orbifolds*, Nucl.
   Phys. B **261** (1985) 678 and B **274** (1986) 285.
+* F. Gliozzi, J. Scherk and D. Olive, *Supersymmetry, supergravity theories and
+  the dual spinor model*, Nucl. Phys. B **122** (1977) 253.
+* J. Polchinski, *String Theory*, Vol. II, chapters 10-13.
 
 ---
 

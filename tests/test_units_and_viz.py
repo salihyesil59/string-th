@@ -171,3 +171,16 @@ def test_veneziano_plot_respects_the_clip(tmp_path):
     assert plot_veneziano(
         s, veneziano(s, -0.35), veneziano_pole_positions(4), tmp_path / "v.png", clip=8.0
     ).exists()
+
+
+def test_supersymmetry_plot(tmp_path):
+    from stringsim.quantum.partition import oscillator_degeneracies
+    from stringsim.superstring.rns import Sector, open_superstring_levels, sector_degeneracies
+    from stringsim.viz.plots import plot_supersymmetry
+
+    assert plot_supersymmetry(
+        open_superstring_levels(5),
+        oscillator_degeneracies(30, 24),
+        sector_degeneracies(Sector.NS, 30),
+        tmp_path / "susy.png",
+    ).exists()
