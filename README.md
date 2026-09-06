@@ -16,7 +16,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 159 checks
+python -m pytest                          # 225 checks
 ```
 
 ---
@@ -177,7 +177,7 @@ computed, and Jacobi's *aequatio identica satis abstrusa*
 over 80 orders — the statement that bosons and fermions are equinumerous at
 every mass level, the first fingerprint of spacetime supersymmetry.
 
-### 3. Compactification and T-duality — `stringsim.compactification`
+### 3. A circle: winding and T-duality — `stringsim.compactification.circle`
 
 Put one direction on a circle of radius `R`. Momentum is quantised, `n/R`, as it
 would be for a point particle; but a string can also *wind*, at energy
@@ -198,7 +198,74 @@ states: four with `(n,w) = (±1,±1)` carrying one oscillator, which enlarge
 and no oscillators — the bosonic string's tachyon tower passing through zero
 mass. The two kinds are labelled separately rather than lumped together.
 
-### 4. D-branes — `stringsim.branes`
+### 4. A torus: the Narain lattice and `O(d,d;Z)` — `stringsim.compactification.torus`
+
+Compactifying `d` directions is not just `d` copies of the circle. A constant
+metric `G_ij` **and** a constant antisymmetric `B_ij` are now available — `d^2`
+moduli in all — and the duality group grows from `R -> alpha'/R` to the full
+`O(d,d;Z)`. With `Z = (w, n)` the charge vector and `E = G + B`,
+
+```
+l_L = (1/sqrt2) G^{-1/2} (n + E^T w),      l_R = (1/sqrt2) G^{-1/2} (n - E w)
+
+alpha' M^2 = l_L^2 + l_R^2 + 2(N + Ntilde - 2),   l_L^2 - l_R^2 = 2 n.w = 2(N - Ntilde)
+```
+
+**Two quadratic forms on one lattice.** The mass is `Z^T H Z` with the
+generalized metric `H(G,B)`, positive definite and moduli-dependent; level
+matching is `Z^T eta Z` with `eta = [[0,I],[I,0]]`, indefinite and *fixed*. The
+Narain lattice `Gamma_{d,d}` is even (norms `2 n.w`) and self-dual
+(`|det eta| = 1`) at every point in moduli space, which is what keeps the
+one-loop amplitude modular invariant while the moduli vary.
+
+**The first thing checked is the old case.** At `d = 1` the torus spectrum
+agrees with `circle.py` state for state, across radii and across values of
+`alpha'` — 43 level-matched states each time, identical multisets. A
+generalisation that cannot reproduce what it generalises is not one.
+
+**T-duality.** Three kinds of generator: a lattice basis change, an integer
+shift of `B` (so `B` is periodic — a modulus with no large-field limit), and
+the factorized duality exchanging `w^k <-> n_k`, which at `d = 1` is exactly
+`R -> alpha'/R`. Each is verified to be an integer matrix preserving `eta`, and
+to leave the spectrum invariant.
+
+> A trap worth recording. The obvious test — enumerate the spectrum before and
+> after, compare as multisets — **gives a false negative** for the basis change
+> and the `B` shift. The enumeration is truncated to a box `|n|,|w| <= k`, and
+> those generators shear the box, so states near the edge leave the window. The
+> factorized dualities merely permute components and pass. `spectrum_is_dual`
+> therefore follows each state through the charge map instead; the masses then
+> agree to `1e-15` for every generator and for their products.
+
+**The gauge group is a root system.** A massless vector needs
+`(l_L^2, l_R^2) = (2, 0)` or `(0, 2)` — a lattice vector of squared length 2,
+which is the standard normalisation for the roots of a simply laced algebra.
+Because all roots have the *same* length, only `A`, `D`, `E` can appear from a
+plain torus; `B_n`, `C_n`, `G_2`, `F_4` need orbifolds or Wilson lines.
+
+The search is complete, not truncated: `l_R = 0` forces `n = E w` and
+`l_L^2 = 2 w^T G w`, so `w^T G w = 1` bounds `w` outright.
+
+| point in moduli space | roots per side | algebra |
+|---|---|---|
+| generic `T^2` | 0 | `u(1)^2` |
+| one radius self-dual | 2 | `su(2) + u(1)` |
+| self-dual `T^d` | `2d` | `su(2)^d` |
+| `A_2` point of `T^2` | 6 | `su(3)` |
+
+The `A_2` point is `G = [[1, -1/2], [-1/2, 1]]`, `B = [[0, 1/2], [-1/2, 0]]`,
+chosen so that `w^T G w = 1` has six solutions *and* `E = G + B` is an integer
+matrix, which is what makes `n = E w` an allowed momentum for each of them.
+
+**Counting alone is not always enough**, and the code says so rather than
+guessing: rank 3 with six roots is `su(2)^3` *or* `su(3) + u(1)`, and
+`identify_algebra(3, 6)` returns both. `gauge_algebra` settles it from the
+geometry — it splits the roots into connected components under
+non-orthogonality, finding three orthogonal pairs rather than six coplanar
+vectors. `figures/roots_su3.png` is that distinction drawn: a hexagon at 60
+degrees, not two perpendicular pairs.
+
+### 5. D-branes — `stringsim.branes`
 
 Tension `T_p = 1/((2 pi)^p g_s alpha'^{(p+1)/2})`. The single power of `1/g_s`
 is the point: heavy at weak coupling, light at strong coupling — unlike a field
@@ -221,7 +288,7 @@ a length:
 [0,1,2,3]   -> U(1) x U(1) x U(1) x U(1)   4
 ```
 
-### 5. Amplitudes — `stringsim.amplitudes`
+### 6. Amplitudes — `stringsim.amplitudes`
 
 The Veneziano amplitude `A(s,t) = B(-alpha(s), -alpha(t))`, `alpha(x) = 1 +
 alpha' x`, with three things checked numerically:
@@ -244,7 +311,7 @@ Everything is evaluated through `gammaln`/`gammasgn`, not `gamma`: at
 `s = -2000` the amplitude is far past what double precision can represent, and
 `veneziano_log_abs` is the only honest way to look at it.
 
-### 6. Figures and animations — `stringsim.viz`
+### 7. Figures and animations — `stringsim.viz`
 
 GIFs are written with matplotlib's Pillow writer, so no external binary is
 needed. `examples/` produces:
@@ -260,6 +327,8 @@ needed. `examples/` produces:
 | `open_spectrum.png`, `closed_spectrum.png` | mass ladders with degeneracies |
 | `hagedorn.png` | `log d_N` against `sqrt(N)` with the fitted slope |
 | `tduality.png` | the two towers crossing at the self-dual radius |
+| `roots_su2.png`, `roots_su3.png` | root systems of the enhanced gauge groups |
+| `torus_enhancement.png` | where in the `T^2` moduli space the symmetry grows |
 | `brane_separation.png` | levels rising as branes separate |
 | `veneziano.png` | the amplitude and its poles |
 
@@ -274,6 +343,7 @@ python examples/03_critical_dimension.py  # zeta, D=26, modularity, Hagedorn
 python examples/04_tduality.py            # winding, duality, enhanced symmetry
 python examples/05_dbranes.py             # tensions, stretched strings, U(N)
 python examples/06_amplitudes.py          # poles, residues, Regge, hard scattering
+python examples/07_torus.py               # Narain lattice, O(d,d;Z), root systems
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -286,7 +356,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-159 checks, about 5 seconds. They are cross-checks rather than regression
+225 checks, about 25 seconds. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
@@ -301,6 +371,10 @@ wrong, not merely if the code changed. A representative sample:
 * `q^{1/24}/eta(tau)` reproduces the partition-number generating function;
 * the T-dual spectra agree as multisets, and state `(n,w)` at `R` matches
   `(w,n)` at `alpha'/R`;
+* the `T^d` spectrum at `d = 1` is identical to the circle module's, and every
+  `O(d,d;Z)` generator moves each state onto another of the same mass;
+* the roots at the `A_2` point have pairwise products in `{2, 1, -1, -2}` — the
+  hexagon — while the self-dual `T^3` roots split into three orthogonal pairs;
 * `U(N) -> U(k) x U(N-k)` never increases the number of massless vectors;
 * the Virasoro–Shapiro residues are stable under halving the offset, which is
   what "simple pole" means.
@@ -315,8 +389,9 @@ wrong, not merely if the code changed. A representative sample:
 * **M-theory and branes beyond Dp.** M2/M5 branes, the eleven-dimensional
   picture and the DBI action are absent; `branes/` covers the tension, the
   stretched-string spectrum and the gauge group only.
-* **Calabi–Yau compactification.** Only the circle is implemented. Toroidal
-  `T^d` with a Narain lattice would be the natural next step, then orbifolds.
+* **Calabi–Yau compactification and orbifolds.** The torus is implemented, with its full
+  `O(d,d;Z)`; quotienting it to reach chiral spectra, and curved
+  compactifications, are not.
 * **Interacting worldsheets.** Amplitudes are the known closed forms, not a
   moduli-space integral; there is no genus expansion and no loop calculation.
 
@@ -333,6 +408,10 @@ wrong, not merely if the code changed. A representative sample:
   Nuovo Cim. A **57** (1968) 190.
 * R. Hagedorn, *Statistical thermodynamics of strong interactions*, Nuovo Cim.
   Suppl. **3** (1965) 147.
+* K. S. Narain, *New heterotic string theories in uncompactified dimensions*,
+  Phys. Lett. B **169** (1986) 41.
+* A. Giveon, M. Porrati and E. Rabinovici, *Target space duality in string
+  theory*, Phys. Rept. **244** (1994) 77.
 
 ---
 

@@ -25,6 +25,7 @@ from stringsim.viz.plots import (  # noqa: E402
     plot_mass_spectrum,
     plot_mode_spectrum,
     plot_regge_trajectory,
+    plot_root_system,
     plot_tduality,
     plot_veneziano,
 )
@@ -127,3 +128,22 @@ def test_animate_evolution_needs_two_or_three_components(tmp_path):
     ev = evolve(np.cos(sigma)[:, None], boundary="neumann", n_steps=4)
     with pytest.raises(ValueError):
         animate_evolution(ev, tmp_path / "bad.gif")
+
+
+def test_torus_plots_write_files(tmp_path):
+    from stringsim.compactification.torus import TorusBackground, root_vectors
+    from stringsim.viz.plots import plot_enhancement_map, plot_root_system
+
+    left, _ = root_vectors(TorusBackground.su3_point(CONV))
+    assert plot_root_system(left, tmp_path / "roots.png", "A2", "su(3)").exists()
+    assert plot_root_system(np.zeros((0, 2)), tmp_path / "empty.png").exists()
+
+    steps = np.linspace(-1.0, 1.0, 9)
+    counts = np.zeros((9, 9), dtype=int)
+    counts[4, 4] = 6
+    assert plot_enhancement_map(steps, steps, counts, tmp_path / "map.png").exists()
+
+
+def test_root_system_plot_needs_rank_two(tmp_path):
+    with pytest.raises(ValueError):
+        plot_root_system(np.zeros((3, 3)), tmp_path / "bad.png")
