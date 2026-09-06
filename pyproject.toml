@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stringsim"
+version = "0.1.0"
+description = "Simulation toolkit for the bosonic string: worldsheet dynamics, spectrum, compactification, D-branes and amplitudes"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Salih Yesil", email = "salihyesil59@gmail.com" }]
+keywords = [
+    "string theory",
+    "bosonic string",
+    "worldsheet",
+    "Regge trajectory",
+    "T-duality",
+    "D-brane",
+    "Veneziano",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "ruff>=0.4"]
+
+[project.scripts]
+stringsim = "stringsim.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/salihyesil59/string-th"
+Issues = "https://github.com/salihyesil59/string-th/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests", "examples"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

@@ -1,0 +1,11 @@
+# Normalise text in the repository to LF; check out with the platform's endings.
+* text=auto
+
+*.py   text diff=python
+*.md   text
+*.toml text
+*.cfg  text
+
+# Generated figures and animations are binary.
+*.png binary
+*.gif binary
