@@ -28,6 +28,7 @@ __all__ = [
     "plot_fixed_points",
     "plot_supersymmetry",
     "plot_root_connectivity",
+    "plot_fermion_reflection",
 ]
 
 _STYLE = {
@@ -448,5 +449,48 @@ def plot_root_connectivity(named_roots, path, title: str | None = None) -> Path:
     fig.suptitle(
         title or "Non-orthogonal root pairs: blank blocks mean the algebra factorises",
         fontsize=11,
+    )
+    return _save(fig, path)
+
+
+def plot_fermion_reflection(panels, path, title: str | None = None) -> Path:
+    r"""Worldsheet history of ``psi_-``, where the sector is visible as a colour.
+
+    ``panels`` is a sequence of ``(label, evolution)`` pairs of open-string
+    :class:`stringsim.superstring.worldsheet.FermionEvolution` objects.  Each is
+    drawn as ``psi_-^0(tau, sigma)`` over the strip ``[0, pi] x [0, tau_max]``,
+    with ``sigma`` across and ``tau`` up.
+
+    A pulse in ``psi_-`` runs from ``sigma = 0`` to ``sigma = pi``, leaves into
+    ``psi_+`` picking up the factor ``eta``, comes back, and re-enters ``psi_-``
+    unchanged at ``sigma = 0``.  So consecutive stripes differ by ``eta``: in
+    Neveu-Schwarz they **alternate in sign** and the colours flip, in Ramond they
+    do not.  That alternation is the whole reason NS modes are half-integral,
+    and here it is something you can look at rather than derive.
+    """
+    entries = list(panels)
+    if not entries:
+        raise ValueError("give at least one (label, evolution) pair")
+    fig, axes = _fig(1, len(entries), figsize=(4.6 * len(entries), 5.0))
+    axes = np.atleast_1d(axes)
+    scale = max(float(np.max(np.abs(ev.psi_minus[..., 0]))) for _, ev in entries)
+    image = None
+    for ax, (label, ev) in zip(axes, entries, strict=True):
+        image = ax.imshow(
+            np.asarray(ev.psi_minus[..., 0]),
+            origin="lower",
+            aspect="auto",
+            cmap="RdBu_r",
+            vmin=-scale,
+            vmax=scale,
+            extent=(0.0, float(ev.sigma[-1]), 0.0, float(ev.tau[-1])),
+        )
+        ax.set_xlabel(r"$\sigma$")
+        ax.set_title(label, fontsize=10)
+        ax.grid(False)
+    axes[0].set_ylabel(r"$\tau$")
+    fig.colorbar(image, ax=axes[-1], label=r"$\psi_-^{0}$", fraction=0.06, pad=0.03)
+    fig.suptitle(
+        title or r"Each round trip multiplies the pulse by $\eta$", fontsize=11
     )
     return _save(fig, path)
