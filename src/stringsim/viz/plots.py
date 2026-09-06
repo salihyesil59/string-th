@@ -23,6 +23,8 @@ __all__ = [
     "plot_brane_separation",
     "plot_veneziano",
     "plot_mode_spectrum",
+    "plot_root_system",
+    "plot_enhancement_map",
 ]
 
 _STYLE = {
@@ -221,4 +223,77 @@ def plot_mode_spectrum(coefficients, path, title: str = "Normal-mode content") -
     ax.set_xlabel("mode number $n$")
     ax.set_ylabel(r"$|c_n|$")
     ax.set_title(title)
+    return _save(fig, path)
+
+
+def plot_root_system(roots, path, title: str = "Root system", label: str = "") -> Path:
+    r"""Draw a two-dimensional root system as arrows from the origin.
+
+    ``roots`` is an ``(n, 2)`` array of ``l_L`` (or ``l_R``) vectors from
+    :func:`stringsim.compactification.torus.root_vectors`.  Every root has
+    squared length 2, so they all end on the same circle; what distinguishes the
+    algebras is the *angles*.  Four roots at right angles are ``su(2) + su(2)``;
+    six at 60 degrees are ``su(3)``.
+    """
+    roots = np.asarray(roots, dtype=float)
+    if roots.ndim != 2 or roots.shape[1] != 2:
+        raise ValueError("plot_root_system draws rank-2 systems; give an (n, 2) array")
+
+    fig, ax = _fig(figsize=(5.2, 5.2))
+    limit = 1.6
+    if len(roots):
+        radius = float(np.linalg.norm(roots[0]))
+        limit = 1.35 * radius
+        for vector in roots:
+            ax.annotate(
+                "",
+                xy=tuple(vector),
+                xytext=(0.0, 0.0),
+                arrowprops={"arrowstyle": "-|>", "color": "tab:blue", "lw": 1.6},
+            )
+        ax.plot(roots[:, 0], roots[:, 1], "o", ms=5, color="tab:blue")
+        angle = np.linspace(0.0, 2.0 * np.pi, 240)
+        ax.plot(radius * np.cos(angle), radius * np.sin(angle), "--", lw=0.9, color="0.7")
+    ax.plot(0.0, 0.0, "+", ms=10, color="0.3")
+    ax.set_xlim(-limit, limit)
+    ax.set_ylim(-limit, limit)
+    ax.set_aspect("equal", adjustable="box")
+    ax.set_xlabel(r"$\ell^1$")
+    ax.set_ylabel(r"$\ell^2$")
+    ax.set_title("\n".join([title, label]) if label else title)
+    return _save(fig, path)
+
+
+def plot_enhancement_map(g_values, b_values, root_counts, path) -> Path:
+    r"""Where in the ``T^2`` moduli space the gauge symmetry grows.
+
+    ``root_counts`` is a 2-D array indexed ``[g, b]`` over the off-diagonal
+    metric modulus and the ``B``-field modulus.  Enhancement needs an
+    integrality condition, so the picture is a set of *lines* -- rank-one
+    enhancement -- meeting at isolated points where the symmetry becomes
+    ``su(3)``.  It is not a smooth landscape, and that is the physics: the
+    enhanced points form a measure-zero set.
+    """
+    from matplotlib.colors import BoundaryNorm, ListedColormap
+
+    counts = np.asarray(root_counts)
+    colours = ListedColormap(["#f4f4f4", "#c6dbef", "#6baed6", "#08519c"])
+    edges = [0, 2, 4, 6, max(8, int(counts.max()) + 2)]
+
+    fig, ax = _fig(figsize=(6.4, 5.2))
+    mesh = ax.pcolormesh(
+        np.asarray(g_values),
+        np.asarray(b_values),
+        counts.T,
+        cmap=colours,
+        norm=BoundaryNorm(edges, colours.N),
+        shading="nearest",
+    )
+    bar = fig.colorbar(mesh, ax=ax, ticks=[1, 3, 5, 7])
+    bar.ax.set_yticklabels(["0", "2", "4", "6+"])
+    bar.set_label("left-moving roots")
+    ax.set_xlabel(r"$G_{12}$")
+    ax.set_ylabel(r"$B_{12}$")
+    ax.set_title(r"Gauge enhancement on $T^2$ with $G_{11} = G_{22} = 1$")
+    ax.set_aspect("equal", adjustable="box")
     return _save(fig, path)
