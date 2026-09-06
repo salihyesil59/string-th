@@ -61,6 +61,44 @@ class ZetaEstimate:
         return abs(self.value - self.exact)
 
 
+def regularised_shifted_sum(
+    shift: float = 1.0, epsilons: np.ndarray | None = None, n_orders: int = 4
+) -> ZetaEstimate:
+    r"""Extract the Hurwitz value :math:`\zeta(-1, a) = -B_2(a)/2` numerically.
+
+    The same trick as :func:`regularised_sum`, but for a *shifted* tower of
+    modes:
+
+    .. math::
+       \sum_{n \geq 0} (n+a)\, e^{-\epsilon (n+a)}
+       = \frac{1}{\epsilon^2} + \zeta(-1, a) + O(\epsilon),
+       \qquad \zeta(-1, a) = -\tfrac12\left(a^2 - a + \tfrac16\right).
+
+    This is what an orbifold needs.  A boson twisted by :math:`e^{2\pi i \phi}`
+    has modes ``n + phi`` rather than ``n``, so its zero-point energy is
+    :math:`\tfrac12 \zeta(-1, \phi)` instead of :math:`\tfrac12 \zeta(-1,1)`,
+    and the difference is what shifts the twisted-sector ground state.  At
+    ``a = 1/2`` -- an antiperiodic, ``Z_2``-twisted boson -- the value is
+    ``+1/24``, the opposite sign from the familiar ``-1/12``.
+
+    Unlike the ``a = 1`` case the expansion has a term linear in
+    :math:`\epsilon` unless ``a`` is 0, 1/2 or 1, so the fit keeps odd powers
+    too; ``n_orders`` counts all of them.
+    """
+    if not 0.0 < shift <= 1.0:
+        raise ValueError("shift must lie in (0, 1]")
+    eps = np.geomspace(0.02, 0.2, 24) if epsilons is None else np.asarray(epsilons, float)
+    if np.any(eps <= 0):
+        raise ValueError("cutoffs must be positive")
+    modes = np.arange(0, 6000)[:, None] + shift
+    summed = np.sum(modes * np.exp(-eps[None, :] * modes), axis=0)
+    remainder = summed - 1.0 / eps**2
+    design = np.column_stack([eps**k for k in range(n_orders)])
+    coef, *_ = np.linalg.lstsq(design, remainder, rcond=None)
+    exact = -0.5 * (shift**2 - shift + 1.0 / 6.0)
+    return ZetaEstimate(value=float(coef[0]), exact=exact, epsilons=eps)
+
+
 def regularised_sum(epsilons: np.ndarray | None = None, n_orders: int = 3) -> ZetaEstimate:
     r"""Extract ``zeta(-1) = -1/12`` from a smoothly cut-off sum.
 
