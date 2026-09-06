@@ -16,7 +16,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 225 checks
+python -m pytest                          # 286 checks
 ```
 
 ---
@@ -265,7 +265,67 @@ non-orthogonality, finding three orthogonal pairs rather than six coplanar
 vectors. `figures/roots_su3.png` is that distinction drawn: a hexagon at 60
 degrees, not two perpendicular pairs.
 
-### 5. D-branes — `stringsim.branes`
+### 5. An orbifold: twisted sectors and the projection — `stringsim.compactification.orbifold`
+
+Quotient the torus by a finite symmetry `theta` and two things happen at once.
+
+**Untwisted states are projected.** Only `theta`-invariant states survive,
+counted by the character projector `P = (1/N) sum_k theta^k`. What that removes
+is physical: on `S^1/Z_2` the Kaluza-Klein gauge bosons `g_{mu i}` and `B_{mu i}`
+carry one compact index, are odd, and disappear. Of the torus's 576 massless
+states, 530 survive — 529 graviton/`B`/dilaton plus the radius modulus, with the
+**46 vectors gone**. The compactification has no massless vectors from the
+untwisted sector.
+
+That number is computed twice: once by the character projector, which never
+splits an index, and once by counting `(D-2-d)^2 + d^2` by hand. They agree for
+`S^1/Z_2`, `T^2/Z_2` and `T^4/Z_2` (530, 488, 416). For a *rotation* rather than
+a reflection, only the one compact pair with `lambda lambda* = 1` survives, and
+`T^2/Z_3`, `Z_4`, `Z_6` all give `22^2 + 2 = 486`.
+
+**Twisted sectors appear.** Strings closing only up to `theta^k` live at its
+fixed points — `|det(1 - theta^k)|` of them — and carry fractional oscillator
+modes, which shifts the ground-state energy to
+
+```
+a_k = 1 - (1/4) sum_j phi_j (1 - phi_j),      alpha' M^2 / 4 = N - a_k
+```
+
+with `exp(2 pi i phi_j)` the eigenvalues of `theta^k`. The `1/4` is not asserted:
+a boson with modes `n + phi` has zero-point energy `(1/2) zeta(-1, phi)`, and
+`regularised_shifted_sum` extracts `zeta(-1, a) = -B_2(a)/2` from a cut-off sum
+exactly as `-1/12` was extracted for the untwisted string. Summing that over the
+24 transverse bosons reproduces the closed form to `1e-7`, for every sector of
+every orbifold in the table.
+
+| orbifold | phases | `a_1` | fixed points |
+|---|---|---|---|
+| `S^1/Z_2` | 1/2 | 15/16 | 2 |
+| `T^2/Z_2` | 1/2, 1/2 | 7/8 | 4 |
+| `T^4/Z_2` | 1/2 (x4) | 3/4 | 16 |
+| `T^2/Z_3` | 1/3, 2/3 | 8/9 | 3 |
+| `T^2/Z_4` | 1/4, 3/4 | 29/32 | 2 |
+| `T^2/Z_6` | 1/6, 5/6 | 67/72 | 1 |
+
+The fixed points are located as well as counted — they are the classes of
+`(1 - theta^k)^{-1} Lambda / Lambda` — and `figures/fixed_points_z3.png` draws
+them in the hexagonal cell.
+
+**Which orbifolds exist is not a free choice.** `theta` must be a lattice
+automorphism that also preserves `G` and `B`, which is checked by pushing it
+through the `O(d,d;Z)` machinery of the torus module and demanding the moduli
+come back unchanged — a 90-degree rotation is fine on a square lattice and
+rejected on a rectangular one. In two dimensions the crystallographic
+restriction then leaves only `N = 1, 2, 3, 4, 6`, and
+`crystallographic_orders` finds that by searching integer matrices rather than
+quoting it.
+
+**An honest negative result.** None of these orbifolds has a massless twisted
+state: `a_k` never lands on the level lattice, so every twisted level is either
+tachyonic or massive. The bosonic string keeps its instability, and the
+quotient does not cure it.
+
+### 6. D-branes — `stringsim.branes`
 
 Tension `T_p = 1/((2 pi)^p g_s alpha'^{(p+1)/2})`. The single power of `1/g_s`
 is the point: heavy at weak coupling, light at strong coupling — unlike a field
@@ -288,7 +348,7 @@ a length:
 [0,1,2,3]   -> U(1) x U(1) x U(1) x U(1)   4
 ```
 
-### 6. Amplitudes — `stringsim.amplitudes`
+### 7. Amplitudes — `stringsim.amplitudes`
 
 The Veneziano amplitude `A(s,t) = B(-alpha(s), -alpha(t))`, `alpha(x) = 1 +
 alpha' x`, with three things checked numerically:
@@ -311,7 +371,7 @@ Everything is evaluated through `gammaln`/`gammasgn`, not `gamma`: at
 `s = -2000` the amplitude is far past what double precision can represent, and
 `veneziano_log_abs` is the only honest way to look at it.
 
-### 7. Figures and animations — `stringsim.viz`
+### 8. Figures and animations — `stringsim.viz`
 
 GIFs are written with matplotlib's Pillow writer, so no external binary is
 needed. `examples/` produces:
@@ -329,6 +389,8 @@ needed. `examples/` produces:
 | `tduality.png` | the two towers crossing at the self-dual radius |
 | `roots_su2.png`, `roots_su3.png` | root systems of the enhanced gauge groups |
 | `torus_enhancement.png` | where in the `T^2` moduli space the symmetry grows |
+| `fixed_points_z3.png`, `fixed_points_z4.png` | orbifold fixed points in the torus cell |
+| `orbifold_intercepts.png` | how twisting lowers `a_k` |
 | `brane_separation.png` | levels rising as branes separate |
 | `veneziano.png` | the amplitude and its poles |
 
@@ -344,6 +406,7 @@ python examples/04_tduality.py            # winding, duality, enhanced symmetry
 python examples/05_dbranes.py             # tensions, stretched strings, U(N)
 python examples/06_amplitudes.py          # poles, residues, Regge, hard scattering
 python examples/07_torus.py               # Narain lattice, O(d,d;Z), root systems
+python examples/08_orbifold.py            # projection, twisted sectors, fixed points
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -356,7 +419,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-225 checks, about 25 seconds. They are cross-checks rather than regression
+286 checks, about 30 seconds. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
@@ -375,6 +438,10 @@ wrong, not merely if the code changed. A representative sample:
   `O(d,d;Z)` generator moves each state onto another of the same mass;
 * the roots at the `A_2` point have pairwise products in `{2, 1, -1, -2}` — the
   hexagon — while the self-dual `T^3` roots split into three orthogonal pairs;
+* the twisted intercept from the closed form matches the one from cut-off mode
+  sums, and the character projector matches index counting, for every orbifold;
+* the projected state count is a non-negative integer at every level — which is
+  precisely what a sign or conjugation slip in the character sum would break;
 * `U(N) -> U(k) x U(N-k)` never increases the number of massless vectors;
 * the Virasoro–Shapiro residues are stable under halving the offset, which is
   what "simple pole" means.
@@ -389,9 +456,9 @@ wrong, not merely if the code changed. A representative sample:
 * **M-theory and branes beyond Dp.** M2/M5 branes, the eleven-dimensional
   picture and the DBI action are absent; `branes/` covers the tension, the
   stretched-string spectrum and the gauge group only.
-* **Calabi–Yau compactification and orbifolds.** The torus is implemented, with its full
-  `O(d,d;Z)`; quotienting it to reach chiral spectra, and curved
-  compactifications, are not.
+* **Calabi–Yau compactification.** The torus and its `Z_N` orbifolds are
+  implemented; discrete torsion, asymmetric orbifolds and curved
+  compactifications are not.
 * **Interacting worldsheets.** Amplitudes are the known closed forms, not a
   moduli-space integral; there is no genus expansion and no loop calculation.
 
@@ -412,6 +479,8 @@ wrong, not merely if the code changed. A representative sample:
   Phys. Lett. B **169** (1986) 41.
 * A. Giveon, M. Porrati and E. Rabinovici, *Target space duality in string
   theory*, Phys. Rept. **244** (1994) 77.
+* L. Dixon, J. Harvey, C. Vafa and E. Witten, *Strings on orbifolds*, Nucl.
+  Phys. B **261** (1985) 678 and B **274** (1986) 285.
 
 ---
 

@@ -25,6 +25,7 @@ __all__ = [
     "plot_mode_spectrum",
     "plot_root_system",
     "plot_enhancement_map",
+    "plot_fixed_points",
 ]
 
 _STYLE = {
@@ -209,7 +210,7 @@ def plot_veneziano(s_values, amplitude, poles, path, clip: float = 25.0) -> Path
     ax.set_xlabel(r"$s$  (units of $1/\alpha'$)")
     ax.set_ylabel(r"$A(s,t)$")
     ax.set_title(r"Veneziano amplitude: poles at $\alpha' s = N - 1$")
-    ax.set_ylim(-25, 25)
+    ax.set_ylim(-clip, clip)
     return _save(fig, path)
 
 
@@ -296,4 +297,40 @@ def plot_enhancement_map(g_values, b_values, root_counts, path) -> Path:
     ax.set_ylabel(r"$B_{12}$")
     ax.set_title(r"Gauge enhancement on $T^2$ with $G_{11} = G_{22} = 1$")
     ax.set_aspect("equal", adjustable="box")
+    return _save(fig, path)
+
+
+def plot_fixed_points(orbifold, path, sectors=(1,), title: str | None = None) -> Path:
+    r"""Fixed points of a two-dimensional orbifold, drawn in the torus cell.
+
+    The parallelogram is the fundamental cell of the lattice, obtained from a
+    Cholesky factor of ``G`` so that the drawn angles are the real ones -- the
+    hexagonal lattice comes out at 60 degrees, the square one at 90.  Marked on
+    it are the fixed points of each requested ``theta^k``, which is where the
+    twisted strings live.  Their number is ``|det(1 - theta^k)|``: four for
+    ``Z_2``, three for ``Z_3``, two for ``Z_4`` and one for ``Z_6``.
+    """
+    if orbifold.dim != 2:
+        raise ValueError("plot_fixed_points draws two-dimensional orbifolds")
+
+    basis = np.linalg.cholesky(np.asarray(orbifold.background.metric)).T
+    corners = np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [0.0, 0.0]]) @ basis
+
+    fig, ax = _fig(figsize=(5.4, 5.4))
+    ax.plot(corners[:, 0], corners[:, 1], "-", lw=1.2, color="0.55")
+    markers = ["o", "s", "^", "D", "v"]
+    for index, sector in enumerate(sectors):
+        points = np.asarray(orbifold.fixed_point_positions(sector)) @ basis
+        ax.plot(
+            points[:, 0],
+            points[:, 1],
+            markers[index % len(markers)],
+            ms=9 - 2 * index,
+            label=rf"$\theta^{{{sector}}}$: {len(points)} points",
+        )
+    ax.set_aspect("equal", adjustable="box")
+    ax.set_xlabel(r"$X^1 / \sqrt{\alpha'}$")
+    ax.set_ylabel(r"$X^2 / \sqrt{\alpha'}$")
+    ax.set_title(title or f"Fixed points of $T^2/Z_{{{orbifold.order}}}$")
+    ax.legend(loc="upper right", fontsize=9)
     return _save(fig, path)

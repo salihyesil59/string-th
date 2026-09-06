@@ -16,6 +16,7 @@ from stringsim.branes.dbrane import stretched_spectrum  # noqa: E402
 from stringsim.classical.evolve import evolve  # noqa: E402
 from stringsim.classical.rotating import regge_trajectory, rigid_rotator  # noqa: E402
 from stringsim.compactification.circle import self_dual_radius  # noqa: E402
+from stringsim.compactification.torus import TorusBackground  # noqa: E402
 from stringsim.quantum.partition import fit_hagedorn, oscillator_degeneracies  # noqa: E402
 from stringsim.quantum.spectrum import open_bosonic_spectrum  # noqa: E402
 from stringsim.viz.animate import animate_evolution, animate_modes, snapshot_grid  # noqa: E402
@@ -147,3 +148,26 @@ def test_torus_plots_write_files(tmp_path):
 def test_root_system_plot_needs_rank_two(tmp_path):
     with pytest.raises(ValueError):
         plot_root_system(np.zeros((3, 3)), tmp_path / "bad.png")
+
+
+def test_fixed_point_plot(tmp_path):
+    from stringsim.compactification.orbifold import Orbifold
+    from stringsim.viz.plots import plot_fixed_points
+
+    assert plot_fixed_points(Orbifold.z3_hexagonal(CONV), tmp_path / "z3.png").exists()
+    assert plot_fixed_points(
+        Orbifold.z4_square(CONV), tmp_path / "z4.png", sectors=(1, 2)
+    ).exists()
+    with pytest.raises(ValueError):
+        plot_fixed_points(
+            Orbifold.inversion(TorusBackground.self_dual(3, CONV)), tmp_path / "bad.png"
+        )
+
+
+def test_veneziano_plot_respects_the_clip(tmp_path):
+    from stringsim.viz.plots import plot_veneziano
+
+    s = np.linspace(-1.5, 3.5, 400)
+    assert plot_veneziano(
+        s, veneziano(s, -0.35), veneziano_pole_positions(4), tmp_path / "v.png", clip=8.0
+    ).exists()
