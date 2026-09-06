@@ -145,6 +145,9 @@ class RootLattice:
         )
         object.__setattr__(self, "roots", roots)
         object.__setattr__(self, "extra", extra)
+        # basis() runs an exact integer elimination, which is slow enough to be
+        # worth doing once per lattice; the lattice is frozen, so this is safe.
+        object.__setattr__(self, "_cache", {})
 
     # -- shape --------------------------------------------------------------
 
@@ -169,20 +172,24 @@ class RootLattice:
         Coordinates lie in ``(1/2) Z``, so doubling makes everything integral;
         the basis is then halved again on the way out.
         """
-        doubled = np.rint(2.0 * self.generators).astype(int)
-        if not np.allclose(doubled / 2.0, self.generators, atol=_TOL):
-            raise ValueError("generators are not half-integral")
-        rows = _integer_row_basis(doubled.tolist())
-        if len(rows) != self.dim:
-            raise ValueError(
-                f"generators span {len(rows)} dimensions, not {self.dim}"
-            )  # pragma: no cover
-        return np.array(rows, dtype=float) / 2.0
+        if "basis" not in self._cache:
+            doubled = np.rint(2.0 * self.generators).astype(int)
+            if not np.allclose(doubled / 2.0, self.generators, atol=_TOL):
+                raise ValueError("generators are not half-integral")
+            rows = _integer_row_basis(doubled.tolist())
+            if len(rows) != self.dim:
+                raise ValueError(
+                    f"generators span {len(rows)} dimensions, not {self.dim}"
+                )  # pragma: no cover
+            self._cache["basis"] = np.array(rows, dtype=float) / 2.0
+        return self._cache["basis"]
 
     def gram(self) -> np.ndarray:
         """Gram matrix of :meth:`basis`."""
-        b = self.basis()
-        return b @ b.T
+        if "gram" not in self._cache:
+            b = self.basis()
+            self._cache["gram"] = b @ b.T
+        return self._cache["gram"]
 
     def covolume(self) -> float:
         """``sqrt(det Gram)``; 1 exactly when the lattice is self-dual."""

@@ -25,7 +25,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 432 checks
+python -m pytest                          # 467 checks
 ```
 
 ---
@@ -572,10 +572,52 @@ nothing, so Wilson lines are periodic, exactly as `B` is on the torus.
 zero gauge charge and no Wilson line the compact part reproduces the torus
 module's momenta to `1e-14`.
 
-Not enumerated: extra massless vectors carrying winding, which enhance the group
-again at special radii. Finding those needs gauge charges of norm above 2, a
-search of a different size, and `unbroken_roots` says so rather than quietly
-returning a partial answer.
+**Winding states put it back.** `unbroken_roots` above sees only `w = 0`.
+Undoing the Wilson line splits both conditions in two, and the complete
+statement is
+
+```
+|pi + A w|^2 = 2 - 2 w^T G w        and        E w + A^T pi + (1/2) A^T A w  in  Z^d
+```
+
+which `massless_vectors` enumerates **exhaustively**: the left side of the first
+equation cannot be negative, so `w^T G w <= 1` bounds the winding, and each `w`
+leaves a ball of radius at most `sqrt(2)` for the gauge charge — enumerated
+exactly by `gauge_vectors_near`, a Fincke-Pohst walk over the lattice. Nothing
+is truncated, and away from the special moduli the answer collapses back to the
+table above.
+
+On a circle the first equation *solves* for `G` rather than being tested at it,
+so `enhancement_radii` returns the special radii instead of scanning for them —
+and every enhancement point with `G > 1/w_max^2` is found, which is a bound, not
+a hope. A brute scan of the moduli space is in the test suite and finds exactly
+the same points and no others.
+
+| lattice | Wilson line | `G` | roots | algebra |
+|---|---|---|---|---|
+| `E8 x E8` | `0` | generic | 480 | `e8 + e8 + u(1)^2` |
+| `E8 x E8` | `0` | `1` | 482 | `e8 + e8 + su(2) + u(1)` |
+| `E8 x E8` | `(1, 0^15)` | `1/2` | 384 | `so(18) + e8 + u(1)` |
+| `E8 x E8` | `(1/2, 0^15)` | generic | 324 | `e8 + so(14) + u(1)^3` |
+| `E8 x E8` | `(1/2, 0^15)` | `1/8` | **480** | `e8 + e8 + u(1)^2` |
+| `Spin(32)/Z2` | `(1, 0^15)` | `1/2` | 544 | `so(34) + u(1)` |
+| `Spin(32)/Z2` | `(1/4^16)` | `1/2` | 244 | `su(16) + su(2) + su(2) + u(1)` |
+
+The fifth row is the one worth staring at. `A = (1/2, 0^15)` breaks `E8 x E8`
+down to `e8 + so(14)`, and at `G = 1/8` all 480 roots are back — 156 of them
+carrying winding. **A Wilson line is not gauge-invariant information on its
+own**: that is the same point of moduli space as `A = 0`, reached by an
+`O(17,1;Z)` transformation. `figures/wilson_enhancement.png` draws the whole
+locus in the `(A, G)` plane, and each arc there is exact rather than sampled.
+
+**And the two ten-dimensional theories are one in nine.** `E8 x E8` with
+`A = (1, 0^7; 1, 0^7)` and `Spin(32)/Z2` with `A = (1/2^8; 0^8)` both give
+`so(16) + so(16) + u(1)^2` at **every** radius, and neither has an enhancement
+point anywhere. The lattice statement behind it: `charge_lattice_gram` is even,
+has determinant `-1` and signature `(17, 1)` for both, and an even self-dual
+lattice of that signature is unique up to isomorphism. The uniqueness is a
+theorem, not something the code establishes; what the code shows is that both
+satisfy it and that their gauge content agrees everywhere it can be compared.
 
 ### 8. D-branes — `stringsim.branes`
 
@@ -646,6 +688,7 @@ needed. `examples/` produces:
 | `supersymmetry.png` | equal boson and fermion counts, and the two Hagedorn slopes |
 | `heterotic_roots.png` | root connectivity: two blocks against one |
 | `wilson_breaking.png` | the same picture before and after a Wilson line |
+| `wilson_enhancement.png` | where in the (Wilson line, radius) plane the group grows |
 | `fermion_reflection.png` | a pulse bouncing: NS colours alternate, R do not |
 | `brane_separation.png` | levels rising as branes separate |
 | `veneziano.png` | the amplitude and its poles |
@@ -665,7 +708,7 @@ python examples/07_torus.py               # Narain lattice, O(d,d;Z), root syste
 python examples/08_orbifold.py            # projection, twisted sectors, fixed points
 python examples/09_superstring.py         # NS and R, GSO, type IIA/IIB, which branes
 python examples/10_heterotic.py           # the two lattices, 496, and no tachyon
-python examples/11_heterotic_compactified.py   # Gamma_{16+d,d} and Wilson lines
+python examples/11_heterotic_compactified.py   # Gamma_{16+d,d}, Wilson lines, enhancement
 python examples/12_worldsheet_fermions.py      # fermion transport, reflection, sectors
 ```
 
@@ -679,7 +722,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-432 checks, about 45 seconds. They are cross-checks rather than regression
+467 checks, about 70 seconds. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
