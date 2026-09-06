@@ -29,6 +29,7 @@ __all__ = [
     "plot_supersymmetry",
     "plot_root_connectivity",
     "plot_fermion_reflection",
+    "plot_wilson_enhancement",
 ]
 
 _STYLE = {
@@ -493,4 +494,35 @@ def plot_fermion_reflection(panels, path, title: str | None = None) -> Path:
     fig.suptitle(
         title or r"Each round trip multiplies the pulse by $\eta$", fontsize=11
     )
+    return _save(fig, path)
+
+
+def plot_wilson_enhancement(points, path, generic_count=None, title=None) -> Path:
+    """Where in the (Wilson line, radius) plane the gauge group grows.
+
+    ``points`` is a sequence of ``(a, G, n_roots)``: a one-parameter family of
+    Wilson lines against the circle metric, with the number of massless vectors
+    there.  Every point drawn is an enhancement -- away from these the count is
+    ``generic_count``, which the colour bar is scaled against.
+
+    The picture is the moduli space, not a scan of it: the radii come from
+    solving for ``G`` rather than sampling it, so the arcs are exact loci.
+    """
+    points = np.asarray(list(points), dtype=float)
+    if points.size == 0:
+        raise ValueError("no enhancement points to draw")
+    fig, ax = _fig(figsize=(7.4, 5.0))
+    floor = float(points[:, 2].min() if generic_count is None else generic_count)
+    scatter = ax.scatter(
+        points[:, 0], points[:, 1], c=points[:, 2], s=16, cmap="viridis",
+        vmin=floor, vmax=float(points[:, 2].max()), zorder=3,
+    )
+    ax.set_yscale("log")
+    ax.set_xlabel("Wilson line $a$")
+    ax.set_ylabel(r"$G = (R/\sqrt{\alpha'})^2$")
+    ax.set_title(title or "Enhancement loci in the moduli space of the circle")
+    bar = fig.colorbar(scatter, ax=ax)
+    bar.set_label("massless vectors")
+    if generic_count is not None:
+        bar.set_label(f"massless vectors  (generic radius: {generic_count})")
     return _save(fig, path)

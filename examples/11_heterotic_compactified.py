@@ -5,8 +5,9 @@ Run:  python examples/11_heterotic_compactified.py
 Shows the charge lattice growing to signature (16+d, d), checks the two
 reductions the module has to satisfy -- to the uncompactified heterotic string
 at d = 0 and to the plain torus at zero gauge charge -- and works through the
-standard Wilson-line breakings of both ten-dimensional gauge groups.  Writes
-``figures/wilson_breaking.png``.
+standard Wilson-line breakings of both ten-dimensional gauge groups, then adds
+the winding states that put the symmetry back at special radii.  Writes
+``figures/wilson_breaking.png`` and ``figures/wilson_enhancement.png``.
 """
 
 from __future__ import annotations
@@ -26,7 +27,11 @@ from stringsim.compactification.torus import TorusBackground, narain_momenta  # 
 from stringsim.heterotic.compactified import (  # noqa: E402
     GAUGE_RANK,
     HeteroticBackground,
+    charge_lattice_gram,
+    enhanced_algebra,
+    enhancement_radii,
     gauge_algebra,
+    massless_vectors,
     narain_form,
     unbroken_roots,
     wilson_boost,
@@ -34,7 +39,10 @@ from stringsim.heterotic.compactified import (  # noqa: E402
 from stringsim.heterotic.lattice import d16_plus, e8_squared  # noqa: E402
 from stringsim.heterotic.spectrum import left_mass  # noqa: E402
 from stringsim.units import Conventions  # noqa: E402
-from stringsim.viz.plots import plot_root_connectivity  # noqa: E402
+from stringsim.viz.plots import (  # noqa: E402
+    plot_root_connectivity,
+    plot_wilson_enhancement,
+)
 
 FIG = Path(__file__).resolve().parents[1] / "figures"
 CONV = Conventions()
@@ -167,6 +175,73 @@ def breaking() -> None:
     print()
 
 
+def winding_puts_it_back() -> None:
+    print("=" * 72)
+    print("Winding states, and a Wilson line that undoes itself")
+    print("=" * 72)
+    print("  unbroken_roots sees only w = 0.  The complete condition is")
+    print("    |pi + A w|^2 = 2 - 2 w^T G w   and   E w + A^T pi + (1/2) A^T A w in Z,")
+    print("  and it is finite: the left side cannot be negative, so w^T G w <= 1")
+    print("  bounds the winding and each w leaves a ball of radius sqrt(2) for pi.")
+    print("  On a circle the first equation *solves* for G, so the special radii")
+    print("  are computed, not found by scanning the moduli space.")
+    print()
+    cases = [
+        ("E8 x E8", e8_squared(), "A = 0", line([0.0])),
+        ("E8 x E8", e8_squared(), "A = (1/2, 0^7 ; 0^8)", line([0.5])),
+        ("E8 x E8", e8_squared(), "A = (1, 0^7 ; 0^8)", line([1.0])),
+        ("Spin(32)/Z2", d16_plus(), "A = 0", line([0.0])),
+        ("Spin(32)/Z2", d16_plus(), "A = (1, 0^15)", line([1.0])),
+        ("Spin(32)/Z2", d16_plus(), "A = (1/4^16)", line([0.25] * 16)),
+    ]
+    for name, lattice, label, lines in cases:
+        generic = HeteroticBackground(lattice, CIRCLE, lines)
+        print(f"  {name}, {label}")
+        print(f"    generic radius:      {len(massless_vectors(generic)):>4d} roots  ->  "
+              f"{enhanced_algebra(generic)}")
+        for metric in enhancement_radii(lattice, lines[:, 0], winding_max=3):
+            bg = HeteroticBackground(lattice, TorusBackground(np.array([[metric]])), lines)
+            charges = massless_vectors(bg)
+            winding = int(np.sum(np.abs(charges[:, GAUGE_RANK]) > 1e-9))
+            print(f"    G = {metric:<8.5f} {len(charges):>4d} roots  ->  {enhanced_algebra(bg)}"
+                  f"   ({winding} carry winding)")
+        print()
+    print("  A = (1/2, 0^7; 0^8) breaks E8 x E8 to e8 + so(14) at a generic radius,")
+    print("  and at G = 1/8 all 480 roots are back -- 156 of them with winding.")
+    print("  A Wilson line is not gauge-invariant information on its own: that is")
+    print("  the same point of moduli space as A = 0, reached by O(17,1;Z).")
+    print()
+
+
+def the_two_theories_meet() -> None:
+    print("=" * 72)
+    print("Nine dimensions: one theory, two names")
+    print("=" * 72)
+    pair = [
+        ("E8 x E8", e8_squared(), line([1.0] + [0.0] * 7 + [1.0])),
+        ("Spin(32)/Z2", d16_plus(), line([0.5] * 8)),
+    ]
+    for name, lattice, lines in pair:
+        bg = HeteroticBackground(lattice, CIRCLE, lines)
+        radii = enhancement_radii(lattice, lines[:, 0], winding_max=4)
+        print(f"  {name:<12s} {len(massless_vectors(bg)):>4d} roots  ->  {enhanced_algebra(bg)}")
+        print(f"               enhancement radii with G > 1/16: {radii if radii else 'none'}")
+    print()
+    print("  The same gauge content at every radius, and neither has a point where")
+    print("  anything extra comes down.  The lattice statement behind it: both")
+    print("  charge lattices are even, self-dual and of signature (17, 1), and such")
+    print("  a lattice is unique up to isomorphism -- so this is one theory.")
+    for name, lattice, lines in pair:
+        bg = HeteroticBackground(lattice, CIRCLE, lines)
+        gram = charge_lattice_gram(bg)
+        eigenvalues = np.linalg.eigvalsh(gram)
+        signature = (int(np.sum(eigenvalues > 0)), int(np.sum(eigenvalues < 0)))
+        even = bool(np.all(np.abs(np.diag(gram) % 2) < 1e-9))
+        print(f"    {name:<12s} Gamma_{{17,1}} Gram: even {even}, "
+              f"|det| {abs(np.linalg.det(gram)):.0f}, signature {signature}")
+    print()
+
+
 def figures() -> None:
     unbroken = HeteroticBackground(e8_squared(), CIRCLE)
     broken = HeteroticBackground(e8_squared(), CIRCLE, line([0.5, 0.5]))
@@ -187,6 +262,24 @@ def figures() -> None:
     print("  untouched, the other has split into e7 and su(2).")
     print()
 
+    lattice = e8_squared()
+    points = []
+    for value in np.linspace(0.0, 1.0, 81):
+        lines = line([value])
+        for metric in enhancement_radii(lattice, lines[:, 0], winding_max=2):
+            bg = HeteroticBackground(lattice, TorusBackground(np.array([[metric]])), lines)
+            points.append((value, metric, len(massless_vectors(bg))))
+    plot_wilson_enhancement(
+        points,
+        FIG / "wilson_enhancement.png",
+        generic_count=len(massless_vectors(HeteroticBackground(lattice, CIRCLE, line([0.5])))),
+    )
+    print(f"  wrote {FIG / 'wilson_enhancement.png'}")
+    print("  Each arc is an exact locus, not a sampled one -- the radii are solved")
+    print("  for.  The bright arc peaking at a = 1/2, G = 1/8 reaches 480: the")
+    print("  broken group restored entirely by winding states.")
+    print()
+
 
 if __name__ == "__main__":
     FIG.mkdir(exist_ok=True)
@@ -194,5 +287,7 @@ if __name__ == "__main__":
     wilson_lines_are_rotations()
     reductions()
     breaking()
+    winding_puts_it_back()
+    the_two_theories_meet()
     figures()
     print("done.")
