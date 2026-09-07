@@ -196,7 +196,10 @@ def test_the_off_diagonal_frequency_is_the_separation(separation):
     # slowly pulls the branes together and the frequency drifts with them, so
     # the amplitude is kept small and the run to a dozen periods.
     matrices, velocities = stretched_mode(separation, amplitude=1e-5)
-    step = min(0.002, 0.05 / separation)
+    # the step tracks the period, so both the accuracy and the cost are the
+    # same at every separation; a fixed step would make small r quadratically
+    # more work for no more precision
+    step = 0.006 / separation
     duration = 24.0 * math.pi / separation
     run = evolve(matrices, velocities, step, int(duration / step))
     signal = run.element(1, 0, 1).real

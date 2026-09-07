@@ -110,7 +110,7 @@ def strings_between_branes() -> None:
     print(f"  {'r':>6s} {'measured omega':>16s} {'ratio':>10s}")
     for separation in (0.25, 0.5, 1.0, 2.5, 4.0):
         matrices, velocities = stretched_mode(separation, amplitude=1e-5)
-        step = min(0.002, 0.05 / separation)
+        step = 0.006 / separation  # the step tracks the period, so the cost does not
         run = evolve(matrices, velocities, step, int(24.0 * math.pi / separation / step))
         signal = run.element(1, 0, 1).real
         crossings = np.where(np.diff(np.sign(signal)) != 0)[0]

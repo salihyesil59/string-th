@@ -95,6 +95,12 @@ __all__ = [
     "z2_z2_orbifold",
     "z3_orbifold",
     "z4_orbifold",
+    "elementary_symmetric",
+    "GroupAction",
+    "close_group",
+    "from_abelian",
+    "block_permutation",
+    "delta27_orbifold",
 ]
 
 _TOL = 1e-8
@@ -145,11 +151,16 @@ def minor_gcd(matrix, size: int) -> int:
         raise ValueError(f"size must lie in [0, {min(matrix.shape)}], got {size}")
     if size == 0:
         return 1
+    rows = list(itertools.combinations(range(matrix.shape[0]), size))
     found = 0
-    for rows in itertools.combinations(range(matrix.shape[0]), size):
-        for columns in itertools.combinations(range(matrix.shape[1]), size):
-            block = matrix[np.ix_(rows, columns)].astype(float)
-            found = math.gcd(found, abs(int(round(np.linalg.det(block)))))
+    for columns in itertools.combinations(range(matrix.shape[1]), size):
+        # One stacked determinant call per column choice rather than C(n, k) of
+        # them: the Delta(27) Euler characteristic needs a quarter of a million,
+        # and doing them one at a time dominated the whole test suite.
+        picked = matrix[:, list(columns)].astype(float)
+        blocks = np.stack([picked[list(choice)] for choice in rows])
+        for value in np.rint(np.linalg.det(blocks)).astype(np.int64):
+            found = math.gcd(found, abs(int(value)))
             if found == 1:
                 return 1  # nothing smaller is possible, so stop enumerating
     return found
@@ -471,3 +482,284 @@ def z2_z2_orbifold() -> OrbifoldAction:
         group, [first, second], [(1.0 + 0j, -1.0 + 0j, -1.0 + 0j), (-1.0 + 0j, 1.0 + 0j, -1.0 + 0j)]
     )
     return OrbifoldAction(group, rotations, phases)
+
+
+# ---------------------------------------------------------------------------
+# groups that need not be abelian
+# ---------------------------------------------------------------------------
+
+
+def elementary_symmetric(order: int, matrix) -> complex:
+    r"""``e_p`` of a matrix's eigenvalues, as the sum of its principal minors.
+
+    Equal to :math:`\mathrm{Tr}\,\Lambda^p A`, which is what the character on
+    ``p``-forms needs.  Computing it from minors rather than from eigenvalues
+    means a permutation matrix is handled without ever diagonalising it -- and
+    permutations are exactly what a non-abelian orbifold group brings.
+    """
+    matrix = np.asarray(matrix, dtype=complex)
+    if order == 0:
+        return 1.0 + 0.0j
+    size = matrix.shape[0]
+    if order > size:
+        return 0.0 + 0.0j
+    return sum(
+        complex(np.linalg.det(matrix[np.ix_(pick, pick)]))
+        for pick in itertools.combinations(range(size), order)
+    )
+
+
+@dataclass(frozen=True)
+class GroupAction:
+    r"""A finite group acting on :math:`T^6`, abelian or not.
+
+    Each element is carried twice: as an integer matrix on the lattice, and as a
+    complex matrix on the holomorphic coordinates.  The second is not derivable
+    from the first -- a lattice rotation has eigenvalues in conjugate pairs and
+    which half is holomorphic is a choice of complex structure -- and for a
+    non-abelian group it need not be diagonal, so a triple of phases will not do.
+
+    Build one with :func:`close_group` from generators.
+    """
+
+    lattice: tuple[np.ndarray, ...]
+    holomorphic: tuple[np.ndarray, ...]
+
+    def __post_init__(self) -> None:
+        # commuting_pairs and conjugacy_classes are quadratic in |G| and the
+        # Euler characteristic is far worse; the object is frozen, so caching
+        # them is safe and is the difference between seconds and minutes.
+        object.__setattr__(self, "_cache", {})
+        if len(self.lattice) != len(self.holomorphic):
+            raise ValueError("give one holomorphic matrix per lattice matrix")
+        if not self.lattice:
+            raise ValueError("the group must contain at least the identity")
+        for real, holo in zip(self.lattice, self.holomorphic, strict=True):
+            if real.shape != (self.dim, self.dim):
+                raise ValueError(f"lattice matrices must be {self.dim}x{self.dim}")
+            if holo.shape != (self.dim // 2, self.dim // 2):
+                raise ValueError("holomorphic matrices must be half the lattice size")
+            if abs(np.linalg.det(holo) - 1.0) > _TOL:
+                raise ValueError(
+                    f"an element has holomorphic determinant {np.linalg.det(holo)}, not 1: "
+                    "the action is not in SU(3) and the quotient is not Calabi-Yau"
+                )
+
+    @property
+    def size(self) -> int:
+        """``|G|``."""
+        return len(self.lattice)
+
+    @property
+    def dim(self) -> int:
+        """Real dimension of the torus."""
+        return self.lattice[0].shape[0]
+
+    @property
+    def is_abelian(self) -> bool:
+        """True when every pair commutes."""
+        return all(
+            np.array_equal(first @ second, second @ first)
+            for first in self.lattice
+            for second in self.lattice
+        )
+
+    def commuting_pairs(self) -> list[tuple[int, int]]:
+        r"""Indices of the pairs that commute, which is what ``chi`` sums over.
+
+        Their number is :math:`|G|` times the number of conjugacy classes -- a
+        group-theory identity the enumeration reproduces without being told, and
+        a good check that the closure is complete.
+        """
+        if "pairs" in self._cache:
+            return self._cache["pairs"]
+        self._cache["pairs"] = [
+            (first, second)
+            for first in range(self.size)
+            for second in range(self.size)
+            if np.array_equal(
+                self.lattice[first] @ self.lattice[second],
+                self.lattice[second] @ self.lattice[first],
+            )
+        ]
+        return self._cache["pairs"]
+
+    def conjugacy_classes(self) -> list[tuple[int, ...]]:
+        """Element indices grouped into conjugacy classes, identity first.
+
+        Singletons for an abelian group; for a non-abelian one they are what
+        labels the twisted sectors, which is why the blow-up rule below does not
+        simply carry over.
+        """
+        if "classes" in self._cache:
+            return self._cache["classes"]
+        keys = [tuple(matrix.ravel()) for matrix in self.lattice]
+        lookup = {key: index for index, key in enumerate(keys)}
+        seen: set[int] = set()
+        classes = []
+        for index in range(self.size):
+            if index in seen:
+                continue
+            orbit = set()
+            for other in self.lattice:
+                inverse = np.rint(np.linalg.inv(other)).astype(np.int64)
+                conjugate = other @ self.lattice[index] @ inverse
+                orbit.add(lookup[tuple(conjugate.ravel())])
+            seen |= orbit
+            classes.append(tuple(sorted(orbit)))
+        self._cache["classes"] = sorted(classes)
+        return self._cache["classes"]
+
+    def centralizer(self, index: int) -> tuple[int, ...]:
+        """Indices of the elements commuting with the given one."""
+        return tuple(
+            other
+            for other in range(self.size)
+            if np.array_equal(
+                self.lattice[index] @ self.lattice[other],
+                self.lattice[other] @ self.lattice[index],
+            )
+        )
+
+    def euler_characteristic(self) -> float:
+        r"""``(1/|G|) sum_{gh=hg} chi(M^{g,h})``, the general formula.
+
+        The sum is over commuting pairs whether or not the group is abelian --
+        it always was, and for an abelian group that happens to be every pair.
+        No discrete-torsion weight is applied: :math:`H^2(G, U(1))` for a
+        non-abelian group is not the alternating pairings of
+        :mod:`stringsim.compactification.torsion`, so that is left alone here.
+        """
+        if "euler" in self._cache:
+            return self._cache["euler"]
+        identity = np.eye(self.dim, dtype=np.int64)
+        total = 0
+        for first, second in self.commuting_pairs():
+            stacked = np.vstack(
+                [identity - self.lattice[first], identity - self.lattice[second]]
+            )
+            if int(np.linalg.matrix_rank(stacked.astype(float))) < self.dim:
+                continue
+            total += minor_gcd(stacked, self.dim)
+        self._cache["euler"] = total / self.size
+        return self._cache["euler"]
+
+    def untwisted_hodge(self) -> dict[tuple[int, int], int]:
+        r"""``h^{p,q}`` of the invariant forms, averaged over the group.
+
+        The trace on :math:`\Lambda^p \otimes \bar\Lambda^q` is
+        :math:`e_p(A)\overline{e_q(A)}` with ``A`` the holomorphic matrix, and
+        :func:`elementary_symmetric` reads it off the minors, so a permutation
+        needs no special treatment.
+        """
+        out: dict[tuple[int, int], int] = {}
+        half = self.dim // 2
+        for p, q in itertools.product(range(half + 1), repeat=2):
+            total = sum(
+                elementary_symmetric(p, holo) * np.conj(elementary_symmetric(q, holo))
+                for holo in self.holomorphic
+            ) / self.size
+            if abs(total.imag) > _TOL:
+                raise ValueError(f"h^({p},{q}) came out complex: {total}")
+            rounded = round(total.real)
+            if abs(total.real - rounded) > _TOL:
+                raise ValueError(f"h^({p},{q}) came out non-integral: {total.real}")
+            out[(p, q)] = rounded
+        return out
+
+    def __str__(self) -> str:  # pragma: no cover - display only
+        kind = "abelian" if self.is_abelian else "non-abelian"
+        return (
+            f"|G| = {self.size} ({kind}), {len(self.conjugacy_classes())} conjugacy "
+            f"classes, {len(self.commuting_pairs())} commuting pairs"
+        )
+
+
+def close_group(generators, cap: int = 2048) -> GroupAction:
+    """Close a set of ``(lattice, holomorphic)`` generator pairs into a group.
+
+    Breadth-first over products until nothing new appears.  Raises rather than
+    running away if the generators do not generate a finite group.
+    """
+    pairs = [
+        (
+            np.rint(np.asarray(real, dtype=float)).astype(np.int64),
+            np.asarray(holo, dtype=complex),
+        )
+        for real, holo in generators
+    ]
+    if not pairs:
+        raise ValueError("give at least one generator")
+    size = pairs[0][0].shape[0]
+    found: dict[tuple, tuple[np.ndarray, np.ndarray]] = {}
+    frontier = [(np.eye(size, dtype=np.int64), np.eye(size // 2, dtype=complex))]
+    while frontier:
+        real, holo = frontier.pop()
+        key = tuple(real.ravel())
+        if key in found:
+            continue
+        if len(found) >= cap:
+            raise ValueError(f"the generators do not close within {cap} elements")
+        found[key] = (real, holo)
+        for gen_real, gen_holo in pairs:
+            frontier.append((gen_real @ real, gen_holo @ holo))
+    ordered = [found[key] for key in sorted(found)]
+    return GroupAction(
+        lattice=tuple(real for real, _ in ordered),
+        holomorphic=tuple(holo for _, holo in ordered),
+    )
+
+
+def from_abelian(action: OrbifoldAction) -> GroupAction:
+    """Re-present an :class:`OrbifoldAction` as a general :class:`GroupAction`.
+
+    The bridge that makes the general code checkable: the abelian answers were
+    verified against three standard orbifolds, so anything the general path
+    computes must agree with them element for element.
+    """
+    elements = action.group.elements()
+    return GroupAction(
+        lattice=tuple(action.rotations[element] for element in elements),
+        holomorphic=tuple(np.diag(action.phases[element]) for element in elements),
+    )
+
+
+def block_permutation(order, block: int = 2) -> np.ndarray:
+    """The lattice matrix that permutes equal blocks of a torus.
+
+    ``order`` is where each block goes.  A permutation of the factors is the
+    simplest thing an abelian group cannot do, and it is how the non-abelian
+    examples below are built.
+    """
+    order = tuple(int(value) for value in order)
+    if sorted(order) != list(range(len(order))):
+        raise ValueError(f"order must be a permutation of 0..{len(order) - 1}, got {order}")
+    size = block * len(order)
+    out = np.zeros((size, size), dtype=np.int64)
+    for source, target in enumerate(order):
+        out[block * target : block * (target + 1), block * source : block * (source + 1)] = np.eye(
+            block, dtype=np.int64
+        )
+    return out
+
+
+def delta27_orbifold() -> GroupAction:
+    r""":math:`T^6/\Delta(27)`, the smallest interesting non-abelian example.
+
+    Generated by :math:`a = \mathrm{diag}(1, \omega, \omega^2)` on three
+    hexagonal tori and the cyclic permutation :math:`b` of the three factors.
+    Both are in :math:`SU(3)`; they do not commute, and together they close on
+    27 elements in 11 conjugacy classes.
+    """
+    rotation = _ROTATIONS[3]
+    unit = np.eye(2, dtype=np.int64)
+    omega = cmath.exp(2j * cmath.pi / 3.0)
+    first = (
+        lattice_rotation(unit, rotation, rotation @ rotation),
+        np.diag([1.0 + 0j, omega, omega**2]),
+    )
+    second = (
+        block_permutation((1, 2, 0)),
+        np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=complex),
+    )
+    return close_group([first, second])
