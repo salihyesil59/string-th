@@ -32,6 +32,7 @@ __all__ = [
     "animate_fermion_reflection",
     "animate_twisted_string",
     "animate_bion_spike",
+    "animate_modular_reduction",
 ]
 
 
@@ -426,6 +427,86 @@ def animate_bion_spike(
         ax.view_init(elev=26.0, azim=-60.0 + 360.0 * index / max(frames - 1, 1))
         ax.set_title(f"{title or 'BIon spike'}\n{entries[which][0]}", fontsize=10)
         return ()
+
+    anim = FuncAnimation(fig, update, frames=frames, blit=False)
+    return _save_animation(anim, fig, path, fps)
+
+
+def animate_modular_reduction(
+    tau,
+    path,
+    domain_boundary=None,
+    hold: int = 6,
+    fps: int = 6,
+    title: str | None = None,
+) -> Path:
+    r"""Watch a point walk into the fundamental domain.
+
+    ``tau`` is the starting point in the upper half plane and
+    ``domain_boundary`` a complex array outlining the fundamental domain (drawn
+    shaded, if given).  Each frame applies one generator -- an integer shift
+    ``T`` or the inversion ``S`` -- and the trail shows where the point has
+    been.
+
+    Start deep in what a field theory would call the ultraviolet, at
+    ``tau_2 = 0.011``, and the walk carries it up to ``tau_2 ~ 1``.  That is the
+    whole reason a string one-loop amplitude has no ultraviolet divergence:
+    small ``tau_2`` is not a region of the moduli space that has been cut off,
+    it is a copy of a region already counted.
+    """
+    import math
+
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
+
+    point = complex(tau)
+    if point.imag <= 0:
+        raise ValueError("tau must lie in the upper half plane")
+
+    trail = [point]
+    labels = ["start"]
+    for _ in range(200):
+        shift = math.floor(trail[-1].real + 0.5)
+        if shift:
+            trail.append(trail[-1] - shift)
+            labels.append(rf"$T^{{{-shift}}}$")
+        if abs(trail[-1]) < 1.0 - 1e-9:
+            trail.append(-1.0 / trail[-1])
+            labels.append("$S$")
+        else:
+            break
+    else:  # pragma: no cover - the walk always terminates
+        raise RuntimeError("no representative found")
+
+    span = max(2.0, 1.3 * max(abs(z.real) for z in trail))
+    top = max(2.2, 1.25 * max(z.imag for z in trail))
+
+    fig, ax = plt.subplots(figsize=(6.0, 5.0), dpi=110)
+    if domain_boundary is not None:
+        outline = np.asarray(domain_boundary, dtype=complex)
+        ax.fill(outline.real, outline.imag, facecolor="tab:blue", alpha=0.25, edgecolor="0.4")
+    ax.axhline(math.sqrt(3.0) / 2.0, color="tab:red", ls=":", lw=1.0)
+    (path_line,) = ax.plot([], [], "-o", ms=4, lw=1.0, color="0.55")
+    (current,) = ax.plot([], [], "o", ms=10, color="tab:red")
+    caption = ax.set_title("")
+    ax.set_xlim(-span, span)
+    ax.set_ylim(0.0, top)
+    ax.set_xlabel(r"$\tau_1$")
+    ax.set_ylabel(r"$\tau_2$")
+    ax.grid(alpha=0.25)
+
+    frames = len(trail) * hold
+
+    def update(index: int):
+        which = min(index // hold, len(trail) - 1)
+        visible = trail[: which + 1]
+        path_line.set_data([z.real for z in visible], [z.imag for z in visible])
+        current.set_data([visible[-1].real], [visible[-1].imag])
+        caption.set_text(
+            f"{title or 'walking into the fundamental domain'}\n"
+            rf"{labels[which]}:  $\tau_2 = {visible[-1].imag:.4f}$"
+        )
+        return path_line, current
 
     anim = FuncAnimation(fig, update, frames=frames, blit=False)
     return _save_animation(anim, fig, path, fps)

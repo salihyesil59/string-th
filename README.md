@@ -25,7 +25,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 647 checks
+python -m pytest                          # 688 checks
 ```
 
 ---
@@ -825,6 +825,74 @@ Everything is evaluated through `gammaln`/`gammasgn`, not `gamma`: at
 `s = -2000` the amplitude is far past what double precision can represent, and
 `veneziano_log_abs` is the only honest way to look at it.
 
+
+**At one loop the answer is the shape of the integration region** —
+`stringsim.amplitudes.oneloop`. The worldsheet is a torus, and
+
+```
+Z = int_F (d^2 tau / tau_2^2) (tau_2^(1/2) |eta(tau)|^2)^-(D-2)
+```
+
+with `F` the fundamental domain. Both factors are modular invariant, checked on
+random points under `T` and `S` to `1e-14` rather than deduced from
+`eta(-1/tau) = sqrt(-i tau) eta(tau)`.
+
+**That invariance is where the ultraviolet went.** A field theory integrates the
+Schwinger parameter down to zero and diverges. Here small `tau_2` is not a
+region at all — `fundamental_domain_representative` walks any point back in:
+
+| starting `tau` | `tau_2` | reduced to | `tau_2` | steps |
+|---|---|---|---|---|
+| `+0.3000+0.05000i` | 0.05000 | `-0.3077+1.53846i` | 1.53846 | 4 |
+| `-2.7000+0.01100i` | 0.01100 | `-0.3274+0.99197i` | 0.99197 | 5 |
+| `+7.4200+0.00002i` | 0.00002 | `+0.3800+20.00000i` | 20.00000 | 10 |
+
+Over 4000 random starting points the smallest `tau_2` reached is `0.876013`,
+against the corner value `sqrt(3)/2 = 0.866025` — and every matrix has
+determinant 1, so nothing was discarded to get there. `S` sends `0.05i` to
+`20i`: the ultraviolet *is* the infrared, and there is nothing to regulate
+because there is nowhere to regulate.
+`figures/fundamental_domain.png` and `figures/modular_reduction.gif` are that
+sentence drawn and animated.
+
+**What does diverge is the infrared, and it is the tachyon.** Fitting
+`log I = -pi alpha' M^2 tau_2 + b log tau_2 + c` at large `tau_2`:
+
+| `D` | `alpha' M^2` | `tau_2` power | `-(D-2)/2` |
+|---|---|---|---|
+| 26 | -4.000000 | -12.0000 | -12 |
+| 10 | -1.333333 | -4.0000 | -4 |
+| 6 | -0.666667 | -2.0000 | -2 |
+
+The first column is the mass of the lightest closed string, read off an
+*amplitude* and equal to what `closed_bosonic_spectrum` gives at `N = 0` from
+the *spectrum*. The second is the transverse momentum integral, and it is worth
+having: fitting only the exponential and dropping the `log` term returns `-3.13`
+instead of `-4`, which is how one learns the subleading term is not optional.
+
+**The superstring integrand is zero pointwise.** Its numerator is
+`theta_3^4 - theta_2^4 - theta_4^4`, which vanishes to `5e-15` as *functions* on
+200 random points — the same abstruse identity `jacobi_identity_residual` proves
+on integer `q`-series in section 2. The one-loop cosmological constant is not
+small after a cancellation between regions of moduli space; there is nothing to
+integrate.
+
+**The cylinder is one diagram in two languages.** Between two `Dp`-branes it is
+a loop of *open* strings in the modulus `t`, and a tree exchange of *closed*
+strings in `s = 1/t`; `eta(i/t) = sqrt(t) eta(it)` turns one integrand into the
+other, verified at `1e-15` for `p = 0, 1, 3, 6` and several separations
+(`figures/channel_duality.png`). That equality is why a one-loop gauge-theory
+diagram is a statement about gravity. For the superstring the same integrand
+vanishes — `1e-13` against a bosonic `1e3` — so **parallel BPS branes exert no
+force**: bosons cancelling fermions in one channel, NS-NS attraction cancelling
+R-R repulsion in the other. One identity, seen twice.
+
+One numerical caveat, stated because it bites: the `eta` product converges in
+powers of `|q| = e^{-2 pi tau_2}`, so a point at `tau_2 = 0.01` needs thousands
+of terms, not hundreds. With the default the invariance check reads `1e-3`
+instead of `1e-11`, and the tests assert that the gap closes when more terms are
+asked for.
+
 ### 10. Figures and animations — `stringsim.viz`
 
 GIFs are written with matplotlib's Pillow writer, so no external binary is
@@ -853,6 +921,10 @@ needed. `examples/` produces:
 | `twisted_string.gif` | a string whose two ends differ by a rotation |
 | `dbi_field.png` | Born-Infeld against Maxwell, and the field that cannot be exceeded |
 | `bion_spike.png`, `bion_spike.gif` | the funnel a string makes in the brane it ends on |
+| `fundamental_domain.png` | where the one-loop integral is taken, and where it is not |
+| `modular_reduction.gif` | a point walking out of the would-be ultraviolet |
+| `one_loop_integrand.png` | the infrared growth, and the tachyon mass in its slope |
+| `channel_duality.png` | an open loop and a closed exchange, on top of each other |
 | `fermion_reflection.png` | a pulse bouncing: NS colours alternate, R do not |
 | `fermion_reflection.gif` | the same pulse, moving -- and coming back upside down in NS |
 | `brane_separation.png` | levels rising as branes separate |
@@ -877,6 +949,7 @@ python examples/11_heterotic_compactified.py   # Gamma_{16+d,d}, Wilson lines, e
 python examples/12_worldsheet_fermions.py      # fermion transport, reflection, sectors
 python examples/13_asymmetric_and_torsion.py   # non-geometric twists, epsilon(g,h)
 python examples/14_dbi_and_m_theory.py         # DBI, the BIon spike, M2/M5
+python examples/15_one_loop.py                # modular invariance, no ultraviolet
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -889,7 +962,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-647 checks, about 80 seconds. They are cross-checks rather than regression
+688 checks, about 90 seconds. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
@@ -944,8 +1017,9 @@ wrong, not merely if the code changed. A representative sample:
   discrete-torsion phases are derived — but the states themselves are not built,
   shifts are not implemented, and the fixed-point data a Hodge number needs is
   absent. Curved compactifications are out of scope entirely.
-* **Interacting worldsheets.** Amplitudes are the known closed forms, not a
-  moduli-space integral; there is no genus expansion and no loop calculation.
+* **Higher genus, and amplitudes with insertions.** The one-loop vacuum diagram
+  and its moduli space are computed; two loops, vertex operators on the torus,
+  and the annulus with different branes at the two ends are not.
 
 ---
 
