@@ -30,6 +30,7 @@ __all__ = [
     "plot_root_connectivity",
     "plot_fermion_reflection",
     "plot_wilson_enhancement",
+    "plot_twist_classification",
 ]
 
 _STYLE = {
@@ -525,4 +526,61 @@ def plot_wilson_enhancement(points, path, generic_count=None, title=None) -> Pat
     bar.set_label("massless vectors")
     if generic_count is not None:
         bar.set_label(f"massless vectors  (generic radius: {generic_count})")
+    return _save(fig, path)
+
+
+def plot_twist_classification(rows, path, title: str | None = None) -> Path:
+    """How the automorphisms of each background split, as fractions of the group.
+
+    ``rows`` is a sequence of ``(label, geometric, asymmetric_failing,
+    asymmetric_matched)``.  The totals run from 2 to several hundred, so the
+    bars are drawn as *proportions* with ``|Aut|`` written at the end: a log
+    axis would let the leftmost segment fill the bar whatever its share, which
+    is precisely the comparison the picture is for.
+
+    A background with no enhanced gauge symmetry is one solid colour: every
+    symmetry of a generic torus is a motion of it.  Where the symmetry is
+    enhanced the asymmetric twists take most of the group, and level matching
+    then removes most of those again.
+    """
+    rows = list(rows)
+    if not rows:
+        raise ValueError("give at least one row")
+    labels = [row[0] for row in rows]
+    counts = np.array([[row[1], row[2], row[3]] for row in rows], dtype=float)
+    totals = counts.sum(axis=1)
+    if np.any(totals <= 0):
+        raise ValueError("every background must have at least the identity")
+    shares = counts / totals[:, None]
+
+    fig, ax = _fig(figsize=(8.6, 4.8))
+    positions = np.arange(len(rows))
+    colours = ("tab:blue", "0.75", "tab:orange")
+    names = ("geometric", "asymmetric, not level-matched", "asymmetric, level-matched")
+    left = np.zeros(len(rows))
+    for column, (colour, name) in enumerate(zip(colours, names, strict=True)):
+        ax.barh(positions, shares[:, column], left=left, color=colour, label=name)
+        for index, (share, start) in enumerate(zip(shares[:, column], left, strict=True)):
+            if share > 0.06:
+                ax.text(
+                    start + share / 2.0,
+                    index,
+                    f"{int(counts[index, column])}",
+                    va="center",
+                    ha="center",
+                    fontsize=9,
+                    color="white" if colour != "0.75" else "0.15",
+                )
+        left = left + shares[:, column]
+    for index, total in enumerate(totals):
+        ax.text(1.02, index, f"|Aut| = {int(total)}", va="center", fontsize=9)
+    ax.set_yticks(positions)
+    ax.set_yticklabels(labels)
+    ax.set_xlim(0.0, 1.30)
+    ax.set_xticks([0.0, 0.25, 0.5, 0.75, 1.0])
+    ax.set_xticklabels(["0", "25%", "50%", "75%", "100%"])
+    ax.set_xlabel("share of the automorphism group")
+    ax.grid(axis="y", visible=False)
+    ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.01), ncol=3, fontsize=9, frameon=False)
+    fig.suptitle(title or "Every symmetry of a generic torus is a motion of it", fontsize=11)
     return _save(fig, path)

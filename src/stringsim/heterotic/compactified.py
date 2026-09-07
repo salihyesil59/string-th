@@ -92,7 +92,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from ..compactification.torus import TorusBackground, odd_metric
+from ..compactification.torus import TorusBackground, integer_points_in_ball, odd_metric
 from .lattice import RootLattice, e8_squared
 
 __all__ = [
@@ -365,41 +365,6 @@ def gauge_algebra(background: HeteroticBackground) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _points_in_ball(
-    gram: np.ndarray, offset: np.ndarray, radius_sq: float, tol: float = 1e-9
-) -> np.ndarray:
-    r"""Integer ``m`` with ``(m - offset)^T Q (m - offset) <= radius_sq``.
-
-    Fincke-Pohst: factor ``Q = R^{T}R`` with ``R`` upper triangular, so the form
-    is :math:`\sum_i (\sum_{j \geq i} R_{ij}(m_j - y_j))^2`.  Choosing the last
-    coordinate first leaves an interval for each earlier one, and the recursion
-    visits exactly the points inside the ellipsoid -- no box, no truncation.
-    """
-    size = gram.shape[0]
-    triangular = np.linalg.cholesky(gram).T
-    offset = np.asarray(offset, dtype=float).reshape(size)
-    found: list[np.ndarray] = []
-    current = np.zeros(size)
-
-    def descend(index: int, budget: float) -> None:
-        if index < 0:
-            found.append(current.copy())
-            return
-        tail = float(triangular[index, index + 1 :] @ (current[index + 1 :] - offset[index + 1 :]))
-        diagonal = triangular[index, index]
-        half_width = np.sqrt(max(budget, 0.0)) / diagonal
-        centre = offset[index] - tail / diagonal
-        for value in range(
-            int(np.ceil(centre - half_width - tol)), int(np.floor(centre + half_width + tol)) + 1
-        ):
-            current[index] = value
-            term = diagonal * (value - offset[index]) + tail
-            descend(index - 1, budget - term * term)
-
-    descend(size - 1, radius_sq + tol)
-    return np.array(found) if found else np.zeros((0, size))
-
-
 def gauge_vectors_near(
     lattice: RootLattice, centre, radius_sq: float, tol: float = 1e-9
 ) -> np.ndarray:
@@ -414,7 +379,7 @@ def gauge_vectors_near(
     basis = lattice.basis()
     centre = np.asarray(centre, dtype=float).reshape(lattice.dim)
     offset = np.linalg.solve(basis.T, centre)
-    return _points_in_ball(lattice.gram(), offset, max(radius_sq, 0.0), tol) @ basis
+    return integer_points_in_ball(lattice.gram(), offset, max(radius_sq, 0.0), tol) @ basis
 
 
 def massless_vectors(background: HeteroticBackground, tol: float = 1e-8) -> np.ndarray:
