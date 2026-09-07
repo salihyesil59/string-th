@@ -34,6 +34,7 @@ __all__ = [
     "animate_bion_spike",
     "animate_modular_reduction",
     "animate_fuzzy_sphere",
+    "animate_matrix_eigenvalues",
 ]
 
 
@@ -573,4 +574,81 @@ def animate_fuzzy_sphere(frames, path, hold: int = 7, fps: int = 10, title=None)
         return ()
 
     anim = FuncAnimation(fig, update, frames=total, blit=False)
+    return _save_animation(anim, fig, path, fps)
+
+
+def animate_matrix_eigenvalues(
+    times,
+    eigenvalues,
+    kinetic,
+    potential,
+    path,
+    stride: int = 2,
+    fps: int = 24,
+    title: str | None = None,
+) -> Path:
+    r"""D0-branes scattering, and the string energy that appears when they meet.
+
+    ``eigenvalues`` has shape ``(n_frames, n_branes)`` -- the positions along one
+    direction -- and ``kinetic`` and ``potential`` are the two halves of the
+    energy at the same times.
+
+    Watch the two panels together.  While the branes are apart the potential is
+    flat on the floor: commuting matrices, free motion, nothing stretched
+    between them.  When they come close the off-diagonal entries become light,
+    the potential takes energy from the motion, and the branes leave in
+    directions no one could have predicted from where they came in.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
+
+    times = np.asarray(times, dtype=float)[::stride]
+    eigenvalues = np.asarray(eigenvalues, dtype=float)[::stride]
+    kinetic = np.asarray(kinetic, dtype=float)[::stride]
+    potential = np.asarray(potential, dtype=float)[::stride]
+    if eigenvalues.ndim != 2:
+        raise ValueError(f"expected (n_frames, n_branes), got {eigenvalues.shape}")
+
+    reach = 1.15 * float(np.max(np.abs(eigenvalues)))
+    fig, (ax, ax2) = plt.subplots(2, 1, figsize=(6.6, 5.4), dpi=110,
+                                  gridspec_kw={"height_ratios": [1.0, 1.2]})
+
+    (points,) = ax.plot([], [], "o", ms=13, color="tab:blue")
+    trails = [
+        ax.plot([], [], "-", lw=0.9, color="0.75", zorder=0)[0]
+        for _ in range(eigenvalues.shape[1])
+    ]
+    ax.set_xlim(-reach, reach)
+    ax.set_ylim(-1.0, 1.0)
+    ax.set_yticks([])
+    ax.set_xlabel("position along $X_1$ (eigenvalues)")
+    ax.grid(alpha=0.2)
+
+    ax2.plot(times, kinetic, lw=1.4, color="tab:orange", label="kinetic")
+    ax2.plot(times, potential, lw=1.4, color="tab:blue", label="potential (stretched strings)")
+    marker = ax2.axvline(times[0], color="0.35", lw=1.2)
+    ax2.set_xlabel("$t$")
+    ax2.set_ylabel("energy")
+    ax2.legend(loc="upper right", fontsize=8)
+    ax2.grid(alpha=0.25)
+    caption = fig.suptitle("")
+    fig.subplots_adjust(hspace=0.55, top=0.90, bottom=0.10)
+
+    trail_length = max(2, len(times) // 12)
+
+    def update(index: int):
+        row = eigenvalues[index]
+        points.set_data(row, np.zeros_like(row))
+        start = max(0, index - trail_length)
+        for which, line in enumerate(trails):
+            piece = eigenvalues[start : index + 1, which]
+            line.set_data(piece, np.full(len(piece), -0.45))
+        marker.set_xdata([times[index], times[index]])
+        caption.set_text(
+            f"{title or 'D0-branes, scattering'}   "
+            f"$t = {times[index]:.2f}$,  $V = {potential[index]:.3f}$"
+        )
+        return (points, marker, *trails)
+
+    anim = FuncAnimation(fig, update, frames=len(times), blit=False)
     return _save_animation(anim, fig, path, fps)
