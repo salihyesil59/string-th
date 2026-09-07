@@ -25,7 +25,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 576 checks
+python -m pytest                          # 647 checks
 ```
 
 ---
@@ -725,6 +725,83 @@ a length:
 [0,1,2,3]   -> U(1) x U(1) x U(1) x U(1)   4
 ```
 
+
+**The brane has its own action** — `stringsim.branes.dbi`. Not a probe but a
+dynamical object:
+
+```
+S = -T_p int d^(p+1)xi sqrt(-det(eta_ab + d_a X d_b X + 2 pi alpha' F_ab))
+```
+
+The matrix is built and `numpy` takes its determinant; the closed form
+`(1 + |grad X|^2)(1 - |e|^2) + (e . grad X)^2` is asserted against that rather
+than used in its place.
+
+**There is a largest electric field.** On a flat brane the determinant is
+`1 - (E/E_crit)^2` with
+
+```
+E_crit = 1 / (2 pi alpha')
+```
+
+which is the fundamental string tension: pull on a string endpoint that hard and
+nothing is left holding it. The expansion of the square root is extracted from
+the function itself by Cauchy's formula — the coefficients are Fourier modes on
+a circle inside the branch cut — and comes out `1, -1/2, -1/8, -1/16, -5/128`
+to `1e-16`: the brane tension, then Maxwell, then the corrections that keep the
+energy finite all the way up. Plotted against the *field* the energy just
+diverges and says nothing; plotted against the **charge** it goes linear where
+Maxwell stays quadratic, and the field needed never exceeds `E_crit`
+(`figures/dbi_field.png`).
+
+**The string reappears as a spike.** Legendre-transforming in `E` —
+numerically, so the closed form can be checked against it — gives
+
+```
+H = T_p sqrt((1+|grad X|^2)(1+|D|^2) - |D x grad X|^2)
+  = T_p sqrt((1 + D.grad X)^2 + |D - grad X|^2)  >=  T_p (1 + D.grad X)
+```
+
+with equality exactly at `D = grad X`. For that BPS solution the energy above
+the flat brane is a boundary term, height times flux — and with the flux
+quantised, `oint (2 pi alpha' T_p D).dS = n`, the spike weighs precisely what
+`n` fundamental strings of its height weigh:
+
+| `p` | `n` | flux | spike tension | `n T_F1` | relative |
+|---|---|---|---|---|---|
+| 3 | 1 | 1.00000 | 0.1591549435 | 0.1591549431 | `2e-9` |
+| 3 | 4 | 4.00000 | 0.6366197739 | 0.6366197724 | `2e-9` |
+| 5 | 2 | 2.00000 | 0.3183098887 | 0.3183098862 | `8e-9` |
+
+The left-hand number is a numerical integral over the brane; the right-hand one
+is `n/(2 pi alpha')`. Every spike is infinitely tall, so what grows with `n` is
+the **width of the funnel**, not its height — which is what
+`figures/bion_spike.png` and `figures/bion_spike.gif` show. `p = 2` is refused
+rather than answered: the harmonic function is a logarithm there, so there is no
+finite height to divide by.
+
+**And the branes all come from eleven dimensions** — `stringsim.branes.mtheory`.
+`n` D0-branes weigh `n/(g_s sqrt(alpha'))`, which is a Kaluza-Klein tower on a
+circle of radius `R_11 = g_s sqrt(alpha')` — growing with the coupling, so
+invisible exactly where perturbation theory works. Fixing that and
+`l_p^3 = g_s alpha'^(3/2)` leaves eleven-dimensional supergravity with two
+branes, and everything in ten dimensions is one of them:
+
+| eleven dimensions | becomes | tension | residual |
+|---|---|---|---|
+| M2 wrapped | F1 | `1/(2 pi alpha')` | `0` |
+| M2 transverse | D2 | `T_2` | `0` |
+| M5 wrapped | D4 | `T_4` | `1e-16` |
+| M5 transverse | NS5 | `1/((2 pi)^5 g_s^2 alpha'^3)` | `0` |
+| momentum | D0 | `1/(g_s sqrt(alpha'))` | `0` |
+
+Each right-hand side comes from `dp_brane_tension` or the string tension,
+neither of which knows about eleven dimensions. The NS5 goes like `1/g_s^2`
+rather than `1/g_s` — it is not a D-brane, and the reduction says so without
+being told. Finally `2 kappa_11^2 T_M2 T_M5 = 2 pi` to `1e-16`: the membrane and
+the fivebrane are electric and magnetic sources of the same three-form, so their
+tensions were never independent.
+
 ### 9. Amplitudes — `stringsim.amplitudes`
 
 The Veneziano amplitude `A(s,t) = B(-alpha(s), -alpha(t))`, `alpha(x) = 1 +
@@ -773,7 +850,11 @@ needed. `examples/` produces:
 | `wilson_breaking.png` | the same picture before and after a Wilson line |
 | `wilson_enhancement.png` | where in the (Wilson line, radius) plane the group grows |
 | `asymmetric_orbifolds.png` | how each background's symmetries split, and what survives |
+| `twisted_string.gif` | a string whose two ends differ by a rotation |
+| `dbi_field.png` | Born-Infeld against Maxwell, and the field that cannot be exceeded |
+| `bion_spike.png`, `bion_spike.gif` | the funnel a string makes in the brane it ends on |
 | `fermion_reflection.png` | a pulse bouncing: NS colours alternate, R do not |
+| `fermion_reflection.gif` | the same pulse, moving -- and coming back upside down in NS |
 | `brane_separation.png` | levels rising as branes separate |
 | `veneziano.png` | the amplitude and its poles |
 
@@ -795,6 +876,7 @@ python examples/10_heterotic.py           # the two lattices, 496, and no tachyo
 python examples/11_heterotic_compactified.py   # Gamma_{16+d,d}, Wilson lines, enhancement
 python examples/12_worldsheet_fermions.py      # fermion transport, reflection, sectors
 python examples/13_asymmetric_and_torsion.py   # non-geometric twists, epsilon(g,h)
+python examples/14_dbi_and_m_theory.py         # DBI, the BIon spike, M2/M5
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -807,7 +889,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-576 checks, about 80 seconds. They are cross-checks rather than regression
+647 checks, about 80 seconds. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
@@ -852,9 +934,11 @@ wrong, not merely if the code changed. A representative sample:
   boundary conditions, the mode numbers and the supercurrent, but cannot
   represent the anticommutator algebra or the fermion bilinear in `T_{++}`.
   Those stay algebraic.
-* **M-theory and branes beyond Dp.** M2/M5 branes, the eleven-dimensional
-  picture and the DBI action are absent; `branes/` covers the tension, the
-  stretched-string spectrum and the gauge group only.
+* **Eleven-dimensional dynamics.** The M2/M5 tensions and their reductions are
+  computed, but the supergravity fields, the M5 worldvolume theory and the
+  Matrix-model definition are not; `mtheory` is a dictionary and its consistency
+  conditions. On the brane side the DBI action is there, but only for one
+  transverse scalar and an abelian gauge field -- no non-abelian Myers terms.
 * **Twisted spectra of asymmetric orbifolds, and Hodge numbers.** The candidate
   twists are enumerated and the consistency conditions applied to them, and the
   discrete-torsion phases are derived — but the states themselves are not built,
