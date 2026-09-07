@@ -25,7 +25,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 878 checks
+python -m pytest                          # 902 checks
 ```
 
 ---
@@ -526,6 +526,56 @@ same `h11 + h21 = 54`. Only the sign of `chi` moves, and it decides which side
 the 48 land on. **Two Calabi-Yau manifolds with their Hodge numbers exchanged is
 a mirror pair, and a phase with one bit of freedom in it produced one.**
 `figures/hodge_diamond.png` puts the two diamonds side by side.
+
+
+**And the group need not be abelian.** Of the three ingredients above, two never
+used commutativity and one did. `GroupAction` separates them.
+
+`chi` sums over **commuting pairs** — it always did, and for an abelian group
+that happens to be every pair. The untwisted forms average a character, and the
+character is `e_p(A) conj(e_q(A))` read off the **principal minors** of the
+holomorphic matrix, so a permutation of the three tori needs no diagonalising:
+`e_p` of the cyclic permutation is `(1, 0, 0, 1)`.
+
+The check is that re-presenting the three verified abelian orbifolds through the
+general code gives exactly the same numbers back — `chi` and every entry of the
+diamond, for `Z_3`, `Z_4` and `Z_2 x Z_2`.
+
+**`Delta(27)`** is the smallest interesting example: `a = diag(1, w, w^2)` on
+three hexagonal tori and `b` the cyclic permutation of the factors. Both are in
+`SU(3)`, they do not commute, and together they close on 27 elements.
+
+| orbifold | `\|G\|` | classes | untwisted `(h11, h21)` | `h30` | `chi` |
+|---|---|---|---|---|---|
+| `T^6/Z_3` | 3 | 3 | (9, 0) | 1 | +72 |
+| `T^6/(Z_3 x Z_3)` | 9 | 9 | (3, 0) | 1 | +168 |
+| `T^6/Delta(27)` | 27 | 11 | (1, 0) | 1 | +72 |
+
+`h30 = 1` all the way along — the permutation has determinant 1 too, so the
+quotient stays Calabi-Yau — and the untwisted forms are projected harder as the
+group grows, 9 then 3 then 1.
+
+The group theory carries its own check, and it is a good one:
+
+```
+commuting pairs = |G| x (number of conjugacy classes)
+81 = 9 x 9        (Z_3 x Z_3)
+297 = 27 x 11     (Delta(27))
+```
+
+Nothing puts that in. The commuting pairs are found one at a time and the
+classes by conjugating separately, and they agree — which is the cheapest way to
+know the closure is complete and the conjugation is right.
+`figures/commutation.png` draws both: a solid block for the abelian group, and
+297 of 729 cells for `Delta(27)`.
+
+**What does not carry over is the blow-up count.** For an abelian group the
+twisted sectors are labelled by elements and projected by the whole group; for a
+non-abelian one they are labelled by conjugacy classes and projected by
+centralizers, so the moduli are the centralizer's *orbits* on the fixed locus
+rather than its components — which needs the fixed points and not just how many
+there are. `hodge_numbers` therefore stays abelian-only, and says so rather than
+returning a number it cannot stand behind.
 
 ### 6. The superstring: worldsheet fermions and GSO — `stringsim.superstring`
 
@@ -1182,6 +1232,7 @@ needed. `examples/` produces:
 | `matrix_scattering.gif` | the same, with the string energy beside it |
 | `lyapunov.png` | exponential separation, and its `E^(1/4)` scaling |
 | `shift_landscape.png` | which shift repairs a twist that fails on its own |
+| `commutation.png` | which pairs of a group commute, abelian against not |
 | `fermion_reflection.png` | a pulse bouncing: NS colours alternate, R do not |
 | `fermion_reflection.gif` | the same pulse, moving -- and coming back upside down in NS |
 | `brane_separation.png` | levels rising as branes separate |
@@ -1211,6 +1262,7 @@ python examples/16_myers_effect.py            # matrices, the fuzzy sphere, 1 - 
 python examples/17_hodge_numbers.py           # (51, 3) <-> (3, 51), from fixed points
 python examples/18_matrix_model.py            # D0-brane dynamics, strings, chaos
 python examples/19_shifts.py                  # the shift that repairs T-duality
+python examples/20_non_abelian.py             # Delta(27), and what generalises
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -1223,7 +1275,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-878 checks, about 70 seconds. They are cross-checks rather than regression
+902 checks, a couple of minutes. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
@@ -1279,10 +1331,11 @@ wrong, not merely if the code changed. A representative sample:
 * **Twisted spectra of asymmetric orbifolds.** The candidate twists are
   enumerated, shifts are searched for and the consistency conditions applied, and
   the twisted ground-state energies and degeneracies come out -- but the states
-  above them are not built. Hodge numbers are computed for abelian orbifolds of
-  `T^6` with the one-modulus-per-locus rule; non-abelian groups, overlapping loci
-  and the resolution itself are not, and curved compactifications are out of
-  scope entirely.
+  above them are not built. Hodge numbers are computed with the
+  one-modulus-per-locus rule, which is abelian-only: the Euler characteristic and
+  the untwisted forms work for any finite group, but the blow-up count would need
+  centralizer orbits on the fixed loci. Overlapping loci, the resolution itself
+  and curved compactifications are out of scope entirely.
 * **Higher genus, and amplitudes with insertions.** The one-loop vacuum diagram
   and its moduli space are computed; two loops, vertex operators on the torus,
   and the annulus with different branes at the two ends are not.

@@ -43,6 +43,7 @@ __all__ = [
     "plot_matrix_worldlines",
     "plot_lyapunov",
     "plot_shift_landscape",
+    "plot_commutation",
 ]
 
 FUNDAMENTAL_DOMAIN_FLOOR = math.sqrt(3.0) / 2.0
@@ -1108,4 +1109,33 @@ def plot_shift_landscape(
     ax.set_ylabel("shift in $n$")
     ax.set_title(title or "Which shift repairs a twist that fails on its own")
     ax.legend(loc="upper right", fontsize=9)
+    return _save(fig, path)
+
+
+def plot_commutation(panels, path, title: str | None = None) -> Path:
+    """Which pairs of a group commute, as a matrix of filled cells.
+
+    ``panels`` is a sequence of ``(label, size, pairs)`` where ``pairs`` lists
+    the commuting index pairs.
+
+    An abelian group is a solid block: every pair commutes, and the Euler
+    characteristic sums over all of ``G x G``.  A non-abelian one is a pattern,
+    and the number of filled cells is ``|G|`` times the number of conjugacy
+    classes -- an identity the picture makes visible rather than asserts.
+    """
+    entries = list(panels)
+    if not entries:
+        raise ValueError("give at least one (label, size, pairs) triple")
+    fig, axes = _fig(1, len(entries), figsize=(4.2 * len(entries), 4.4))
+    axes = np.atleast_1d(axes)
+    for ax, (label, size, pairs) in zip(axes, entries, strict=True):
+        grid = np.zeros((size, size))
+        for first, second in pairs:
+            grid[first, second] = 1.0
+        ax.imshow(grid, cmap="Blues", interpolation="nearest", vmin=0.0, vmax=1.4)
+        ax.set_title(f"{label}\n{len(pairs)} of {size * size} pairs", fontsize=10)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.grid(False)
+    fig.suptitle(title or "Commuting pairs: what the Euler characteristic sums over", fontsize=11)
     return _save(fig, path)
