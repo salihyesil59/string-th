@@ -40,6 +40,8 @@ __all__ = [
     "plot_myers_landscape",
     "plot_hodge_diamond",
     "plot_fixed_loci",
+    "plot_matrix_worldlines",
+    "plot_lyapunov",
 ]
 
 FUNDAMENTAL_DOMAIN_FLOOR = math.sqrt(3.0) / 2.0
@@ -1004,4 +1006,66 @@ def plot_fixed_loci(entries, path, title: str | None = None) -> Path:
     ax.plot([], [], "s", color="tab:blue", label="curves ($\\chi = 0$)")
     ax.legend(loc="upper right", fontsize=9)
     ax.set_title(title or "What each element of the group holds still")
+    return _save(fig, path)
+
+
+def plot_matrix_worldlines(times, eigenvalues, path, title: str | None = None) -> Path:
+    """Where the branes are, as the eigenvalues of one matrix through time.
+
+    ``eigenvalues`` has shape ``(n_frames, n_branes)``, from
+    :meth:`stringsim.branes.matrixmodel.Trajectory.eigenvalues`.
+
+    When the lines are far apart the matrices nearly commute and the branes are
+    genuinely separate objects moving freely.  Where the lines approach, the
+    off-diagonal entries -- strings stretched between them -- become light, the
+    potential wakes up, and the motion stops being predictable.  Everything
+    interesting in the matrix model happens where the worldlines cross.
+    """
+    times = np.asarray(times, dtype=float)
+    eigenvalues = np.asarray(eigenvalues, dtype=float)
+    if eigenvalues.ndim != 2:
+        raise ValueError(f"expected (n_frames, n_branes), got {eigenvalues.shape}")
+    fig, ax = _fig(figsize=(7.6, 4.6))
+    for index in range(eigenvalues.shape[1]):
+        ax.plot(times, eigenvalues[:, index], lw=1.3)
+    ax.set_xlabel("$t$")
+    ax.set_ylabel("eigenvalues of $X_1$")
+    ax.set_title(title or "Brane worldlines: where they meet, the strings wake up")
+    return _save(fig, path)
+
+
+def plot_lyapunov(fit, energies, exponents, power, path, title: str | None = None) -> Path:
+    r"""Exponential separation, and the power of the energy it scales with.
+
+    ``fit`` is a :class:`stringsim.branes.matrixmodel.LyapunovFit`; ``energies``
+    and ``exponents`` are the rescaled family, and ``power`` the fitted slope of
+    ``log lambda`` against ``log E``.
+
+    The left panel is the measurement: banked ``log`` growth against time, and a
+    straight line through it.  The right is the prediction with nothing
+    adjustable in it -- ``X -> sX``, ``t -> t/s`` is a symmetry, so ``E`` goes
+    like ``s^4`` and ``lambda`` like ``s``, and the slope has to be ``1/4``.
+    """
+    energies = np.asarray(energies, dtype=float)
+    exponents = np.asarray(exponents, dtype=float)
+    fig, (ax, ax2) = _fig(1, 2, figsize=(10.6, 4.4))
+    ax.plot(fit.times, fit.growth, ".", ms=4, color="tab:blue", label="banked $\\log$ growth")
+    line = fit.exponent * fit.times + (fit.growth[-1] - fit.exponent * fit.times[-1])
+    ax.plot(fit.times, line, "-", lw=1.8, color="tab:red",
+            label=rf"$\lambda = {fit.exponent:.4f}$")
+    ax.set_xlabel("$t$")
+    ax.set_ylabel(r"$\sum \log(\mathrm{growth})$")
+    ax.set_title("two nearby configurations, separating")
+    ax.legend(loc="upper left", fontsize=9)
+
+    ax2.loglog(energies, exponents, "o", ms=7, color="tab:blue", label="measured")
+    grid = np.geomspace(energies.min(), energies.max(), 50)
+    reference = exponents[0] * (grid / energies[0]) ** 0.25
+    ax2.loglog(grid, reference, "-", lw=1.6, color="0.45", label=r"$E^{1/4}$")
+    ax2.set_xlabel("$E$")
+    ax2.set_ylabel(r"$\lambda$")
+    ax2.set_title(rf"fitted power {power:.4f}, against $1/4$")
+    ax2.legend(loc="upper left", fontsize=9)
+    if title:
+        fig.suptitle(title, fontsize=11)
     return _save(fig, path)

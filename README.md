@@ -25,7 +25,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 823 checks
+python -m pytest                          # 849 checks
 ```
 
 ---
@@ -956,6 +956,75 @@ V_matrix / V_continuum = 1 - 1/N^2
 exactly. It is the price of building a sphere out of `N` points, and it is the
 leading correction the D2-brane description cannot see.
 
+
+**Give the matrices time and they become a dynamical system** —
+`stringsim.branes.matrixmodel`. Take the flux away from the Myers potential and
+what is left is the D0-brane matrix quantum mechanics itself, in `A_0 = 0`:
+
+```
+L = (1/2) Tr(Xdot_i Xdot_i) + (1/4) Tr([X_i,X_j][X_i,X_j])
+Xddot_i = [X_j, [X_i, X_j]]
+```
+
+The potential is `myers_potential` at zero flux — checked against it rather than
+written twice — and velocity Verlet integrates the rest.
+
+**Two conserved quantities, conserved for different reasons.** The energy drift
+falls like `h^2` and stays in a band, because the integrator is symplectic. The
+Gauss constraint `sum_i [X_i, Xdot_i] = 0` sits at `1e-13` *whatever the step*,
+because the equations conserve it exactly by the Jacobi identity and the scheme
+inherits that. One is a property of the method and one of the physics:
+
+```
+      dt   energy drift   ratio   max |Gauss|
+  0.0200      4.674e-03       -       1.1e-13
+  0.0100      1.091e-03    4.28       1.3e-13
+  0.0050      2.991e-04    3.65       1.5e-13
+  0.0025      6.718e-05    4.45       2.5e-13
+```
+
+Starting from rest satisfies the constraint for free; anything else goes through
+`project_gauss`, which solves `sum_i [X_i,[X_i,eps]] = G` once by least squares
+rather than approaching it by descent.
+
+**The flat directions are free branes.** Commuting matrices have `V = 0`
+*exactly*, so three branes on a line drift apart for ever, energy drift `0.0e+00`
+and potential still `0.00e+00` after the run. That continuous spectrum is why the
+matrix model describes objects that can separate — and it is exactly what the
+Myers flux term lifts.
+
+**An off-diagonal entry is a string, and its mass is the separation.** Two branes
+at `+/- r/2`, one off-diagonal element of another matrix switched on: the
+potential gives it `a^2 r^2` against a kinetic `adot^2`, so `omega = r`.
+
+| `r` | measured `omega` | ratio |
+|---|---|---|
+| 0.25 | 0.25000 | 0.999995 |
+| 1.00 | 1.00001 | 1.000009 |
+| 4.00 | 4.00003 | 1.000009 |
+
+This is the stretched string of section 8 with the tension scaled out — `X` in
+units where a string of length `L` weighs `L` — reached from a matrix equation of
+motion rather than a mode expansion. The amplitude is kept at `1e-5` on purpose:
+at a finite one the string pulls the branes together, quadratically in the
+amplitude and always attractively, and the frequency drifts down with them.
+
+**And the generic motion is chaotic.** Two configurations a part in `1e8` apart
+separate exponentially; `lyapunov_exponent` measures the rate with a
+renormalised shadow trajectory. The one thing predictable without solving
+anything is the scaling: `X -> sX` with `t -> t/s` is a symmetry (verified to
+`1e-15`), so `E` goes like `s^4` and `lambda` like `s`, and therefore
+
+```
+lambda ~ E^(1/4)
+```
+
+Fitted over a factor of 256 in energy: **0.2529**, against `1/4`.
+`figures/matrix_worldlines.png` shows four branes coming together and leaving in
+directions the incoming state did not determine, and
+`figures/matrix_scattering.gif` puts the energy split beside it — the potential
+sits on the floor while they are apart and wakes up when they meet.
+
 **At one loop the answer is the shape of the integration region** —
 `stringsim.amplitudes.oneloop`. The worldsheet is a torus, and
 
@@ -1059,6 +1128,9 @@ needed. `examples/` produces:
 | `myers_landscape.png` | every way of splitting N branes, and what each costs |
 | `hodge_diamond.png` | the same orbifold with and without a phase, mirrored |
 | `fixed_loci.png` | what each group element holds still, and whether it counts |
+| `matrix_worldlines.png` | four D0-branes meeting, and leaving unpredictably |
+| `matrix_scattering.gif` | the same, with the string energy beside it |
+| `lyapunov.png` | exponential separation, and its `E^(1/4)` scaling |
 | `fermion_reflection.png` | a pulse bouncing: NS colours alternate, R do not |
 | `fermion_reflection.gif` | the same pulse, moving -- and coming back upside down in NS |
 | `brane_separation.png` | levels rising as branes separate |
@@ -1086,6 +1158,7 @@ python examples/14_dbi_and_m_theory.py         # DBI, the BIon spike, M2/M5
 python examples/15_one_loop.py                # modular invariance, no ultraviolet
 python examples/16_myers_effect.py            # matrices, the fuzzy sphere, 1 - 1/N^2
 python examples/17_hodge_numbers.py           # (51, 3) <-> (3, 51), from fixed points
+python examples/18_matrix_model.py            # D0-brane dynamics, strings, chaos
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -1098,7 +1171,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-823 checks, about 95 seconds. They are cross-checks rather than regression
+849 checks, about 70 seconds. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
@@ -1143,13 +1216,14 @@ wrong, not merely if the code changed. A representative sample:
   boundary conditions, the mode numbers and the supercurrent, but cannot
   represent the anticommutator algebra or the fermion bilinear in `T_{++}`.
   Those stay algebraic.
-* **Eleven-dimensional dynamics.** The M2/M5 tensions and their reductions are
-  computed, but the supergravity fields, the M5 worldvolume theory and the
-  Matrix-model definition are not; `mtheory` is a dictionary and its consistency
-  conditions. On the brane side the non-abelian potential is the leading
-  commutator terms only -- the full non-abelian DBI is not unambiguously
-  defined -- and the Chern-Simons normalisation is folded into the flux
-  parameter rather than derived.
+* **Eleven-dimensional dynamics, and the quantum matrix model.** The M2/M5
+  tensions and their reductions are computed, but the supergravity fields, the
+  M5 worldvolume theory and the Matrix-model *definition* are not; `mtheory` is
+  a dictionary and its consistency conditions. The matrix model is integrated
+  classically and bosonically -- no fermions, so no supersymmetry, and none of
+  what makes the flat directions harmless in the quantum theory. On the brane
+  side the non-abelian potential is the leading commutator terms only, and the
+  Chern-Simons normalisation is folded into the flux parameter.
 * **Twisted spectra of asymmetric orbifolds.** The candidate twists are
   enumerated and the consistency conditions applied to them, but the states
   themselves are not built and shifts are not implemented. Hodge numbers are
