@@ -58,16 +58,27 @@ because left- and right-movers each supply half of it.  A zero determinant means
 does not apply; :attr:`AsymmetricTwist.twisted_degeneracy` returns ``None``
 there rather than a wrong number.
 
-**Not here.**  Shifts, which are what rescue most asymmetric rotations that fail
-level matching on their own, and the twisted spectra themselves.  This module
-enumerates the candidate twists and applies the consistency conditions to them;
-building the states is a further step.
+**Shifts rescue what rotation alone cannot.**  A twist may translate as well as
+turn, :math:`Z \to \Omega Z + v`, and then two things change.  The order can
+rise, because the element only closes when :math:`(1 + \Omega + \dots)v`
+lands back on the lattice; and the level-matching condition picks up
+:math:`\tfrac12\langle v, v\rangle`.  The self-dual circle's T-duality twist
+misses by :math:`1/8` on its own, and :func:`shifts_that_close` finds what fixes
+it: no shift in halves or thirds does anything, and
+:math:`v = (\tfrac14, \tfrac14)` closes it at order 4.  That shift also makes
+the orbifold **freely acting** -- :math:`(1-\Omega)x \equiv v` has no solution
+-- so the sector it creates is stuck to nothing.
+
+**Not here.**  The twisted spectra themselves: this module produces the ground
+state energies and degeneracies and applies the consistency conditions, but does
+not enumerate the states above them.
 
 Reference: Narain, Sarmadi and Vafa, Nucl. Phys. B **288** (1987) 551.
 """
 
 from __future__ import annotations
 
+import itertools
 import math
 from dataclasses import dataclass, field
 
@@ -89,6 +100,7 @@ __all__ = [
     "phase_intercept",
     "AsymmetricTwist",
     "classify_automorphisms",
+    "shifts_that_close",
 ]
 
 _TOL = 1e-8
@@ -224,6 +236,26 @@ def _matrix_order(omega: np.ndarray, cap: int = 64) -> int | None:
     return None
 
 
+def _combined_order(omega: np.ndarray, shift: np.ndarray, rotation_order: int, cap: int = 64):
+    """Smallest ``N`` with ``Omega^N = 1`` and ``(1 + ... + Omega^{N-1}) v`` in the lattice.
+
+    A shift can raise the order beyond the rotation's own: applying the twist
+    ``N`` times leaves the shift ``(1 + Omega + ...) v``, and only when that
+    lands back on the lattice is the element really of order ``N``.
+    """
+    size = omega.shape[0]
+    power, running = np.eye(size), np.zeros(size)
+    for order in range(1, cap + 1):
+        running = running + power @ shift
+        power = power @ omega
+        closed = np.allclose(power, np.eye(size), atol=1e-9)
+        landed = np.max(np.abs(running - np.rint(running))) < 1e-8
+        if closed and landed:
+            return order
+    del rotation_order
+    return None
+
+
 @dataclass(frozen=True)
 class AsymmetricTwist:
     """One candidate twist of a Narain background, with its consistency data.
@@ -239,7 +271,9 @@ class AsymmetricTwist:
 
     background: TorusBackground
     omega: np.ndarray
+    shift: np.ndarray | None = None
     order: int = field(init=False)
+    rotation_order: int = field(init=False)
 
     def __post_init__(self) -> None:
         omega = np.asarray(self.omega, dtype=float)
@@ -248,12 +282,26 @@ class AsymmetricTwist:
             raise ValueError(f"omega must be {size}x{size}, got {omega.shape}")
         if np.max(np.abs(omega - np.rint(omega))) > _TOL:
             raise ValueError("omega must be an integer matrix")
-        order = _matrix_order(omega)
-        if order is None:
+        rotation_order = _matrix_order(omega)
+        if rotation_order is None:
             raise ValueError("omega must have finite order")
         momentum_action(self.background, omega)  # raises if the moduli are not fixed
+
+        shift = (
+            np.zeros(size)
+            if self.shift is None
+            else np.asarray(self.shift, dtype=float).reshape(size)
+        )
+        order = _combined_order(omega, shift, rotation_order)
+        if order is None:
+            raise ValueError(
+                "the shift never closes: (1 + Omega + ... ) v stays outside the lattice, "
+                "so this is not a finite-order element"
+            )
         object.__setattr__(self, "omega", omega)
+        object.__setattr__(self, "shift", shift)
         object.__setattr__(self, "order", order)
+        object.__setattr__(self, "rotation_order", rotation_order)
 
     # -- the two rotations --------------------------------------------------
 
@@ -290,6 +338,42 @@ class AsymmetricTwist:
         """
         return bool(np.allclose(self.left_phases, self.right_phases, atol=1e-7))
 
+    # -- the shift ----------------------------------------------------------
+
+    @property
+    def has_shift(self) -> bool:
+        """True when the twist translates as well as rotates."""
+        return bool(np.max(np.abs(self.shift)) > _TOL)
+
+    @property
+    def shift_norm(self) -> float:
+        r"""``<v, v> = v_L^2 - v_R^2``, the only way the shift enters level matching."""
+        return float(self.shift @ odd_metric(self.background.dim) @ self.shift)
+
+    def shift_momenta(self) -> tuple[float, float]:
+        r"""``(v_L^2, v_R^2)`` of the shift, which the twisted energies need."""
+        dim = self.background.dim
+        moved = momentum_frame(self.background) @ self.shift
+        return float(moved[:dim] @ moved[:dim]), float(moved[dim:] @ moved[dim:])
+
+    @property
+    def is_freely_acting(self) -> bool:
+        r"""True when the shift leaves nothing fixed.
+
+        A point is fixed when :math:`(1-\Omega)x \equiv v` modulo the lattice.
+        The obstruction lives in the left kernel of :math:`1-\Omega`, which is
+        spanned by the integer columns of :math:`\sum_k (\Omega^{T})^k`; the
+        equation is solvable exactly when ``v`` pairs to an integer with all of
+        them.  A freely acting orbifold has no twisted states stuck anywhere,
+        which is how a shift breaks supersymmetry without introducing a fixed
+        point to worry about.
+        """
+        projector = sum(
+            np.linalg.matrix_power(self.omega.T, power) for power in range(self.rotation_order)
+        )
+        pairings = projector.T @ self.shift
+        return bool(np.max(np.abs(pairings - np.rint(pairings))) > 1e-8)
+
     # -- consistency --------------------------------------------------------
 
     @property
@@ -303,15 +387,30 @@ class AsymmetricTwist:
         return phase_intercept(self.right_phases)
 
     @property
-    def level_matching_defect(self) -> float:
-        r"""``N (a_R - a_L)`` reduced to ``[0, 1/2]``; zero when the twist is consistent.
+    def twisted_energies(self) -> tuple[float, float]:
+        r"""``(E_L, E_R)`` of the twisted ground state, shift included.
 
-        The ground-state value of :math:`L_0 - \bar L_0` in the twisted sector is
-        :math:`E_L - E_R = a_R - a_L`, and it must be a multiple of ``1/N`` for
-        :math:`T^N` to act trivially on the sector.  A geometric twist has
-        ``a_L = a_R`` identically and so cannot fail.
+        :math:`E = -a + v^2/2` on each side: the rotation lowers the ground
+        state through the fractional mode numbers, and the shift raises it by
+        the momentum it forces the sector to carry.
         """
-        value = (self.order * (self.right_intercept - self.left_intercept)) % 1.0
+        left, right = self.shift_momenta()
+        return -self.left_intercept + left / 2.0, -self.right_intercept + right / 2.0
+
+    @property
+    def level_matching_defect(self) -> float:
+        r"""``N (E_L - E_R)`` reduced to ``[0, 1/2]``; zero when the twist is consistent.
+
+        With no shift :math:`E_L - E_R = a_R - a_L`, and it must be a multiple
+        of ``1/N`` for :math:`T^N` to act trivially on the sector.  A geometric
+        twist has ``a_L = a_R`` identically and so cannot fail.
+
+        A shift adds :math:`\tfrac12\langle v, v\rangle` to the difference and
+        can raise the order as well, which is why a rotation that fails on its
+        own may be rescued by one -- :func:`shifts_that_close`.
+        """
+        left, right = self.twisted_energies
+        value = (self.order * (left - right)) % 1.0
         return float(min(value, 1.0 - value))
 
     @property
@@ -355,9 +454,13 @@ class AsymmetricTwist:
         matched = "level-matched" if self.is_level_matched else (
             f"defect {self.level_matching_defect:.4f}"
         )
+        extra = ""
+        if self.has_shift:
+            free = "freely acting" if self.is_freely_acting else "fixed points remain"
+            extra = f", shift {np.round(self.shift, 4)} ({free})"
         return (
             f"order {self.order} {kind}: phi_L {np.round(self.left_phases, 4)}, "
-            f"phi_R {np.round(self.right_phases, 4)}, {matched}"
+            f"phi_R {np.round(self.right_phases, 4)}, {matched}{extra}"
         )
 
 
@@ -368,3 +471,33 @@ def classify_automorphisms(background: TorusBackground) -> list[AsymmetricTwist]
     are then attributes rather than separate calls.
     """
     return [AsymmetricTwist(background, omega) for omega in narain_automorphisms(background)]
+
+
+def shifts_that_close(
+    background: TorusBackground, omega: np.ndarray, denominator: int = 4, tol: float = 1e-9
+) -> list[AsymmetricTwist]:
+    r"""Every shift in ``(1/M) Z^{2d} / Z^{2d}`` that makes the twist level-matched.
+
+    A rotation that misses the condition on its own is not thrown away.  Adding
+    a translation changes :math:`E_L - E_R` by :math:`\tfrac12\langle v,v\rangle`
+    and can raise the order, and some combination may land on an integer.  The
+    search is finite because the shift only matters modulo the lattice.
+
+    Returns the repaired twists, sorted by order and then by shift.  An empty
+    list means no shift with that denominator works, and the denominator really
+    matters: the self-dual circle's T-duality twist needs quarters, and halves
+    and thirds do nothing for it at all.
+    """
+    if denominator < 1:
+        raise ValueError(f"denominator must be at least 1, got {denominator}")
+    size = 2 * background.dim
+    found = []
+    for entries in itertools.product(range(denominator), repeat=size):
+        shift = np.array(entries, dtype=float) / denominator
+        try:
+            twist = AsymmetricTwist(background, omega, shift)
+        except ValueError:
+            continue  # the shift never closes, so this is not a group element
+        if twist.level_matching_defect < tol:
+            found.append(twist)
+    return sorted(found, key=lambda twist: (twist.order, tuple(twist.shift)))

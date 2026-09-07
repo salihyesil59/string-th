@@ -25,7 +25,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 849 checks
+python -m pytest                          # 878 checks
 ```
 
 ---
@@ -380,6 +380,56 @@ self-dual T^2   order 4   phi = (1/4, 3/4)        |det(1-Omega)| = 4    degenera
 self-dual T^3   order 4   phi = (1/4, 1/2, 3/4)                   16               4
 self-dual T^3   order 6   phi = (1/6, 1/2, 5/6)                    4               2
 ```
+
+
+**And a twist may translate as well as turn.** Above, the self-dual circle's
+T-duality twist was found to miss level matching by exactly `1/8` — which is
+*why* such an orbifold needs a shift. `shifts_that_close` finds it.
+
+With `Z -> Omega Z + v` two things change. The **order**: the element only
+closes when `(1 + Omega + ...) v` lands back on the lattice, so a shift can
+raise it. And the **condition**, which becomes
+
+```
+N [ (a_R - a_L) + <v,v>/2 ]  in  Z
+```
+
+`<v,v> = v^T eta v` is the only way the shift enters, and on a circle that is
+`2 n w` — so a pure momentum or pure winding shift contributes nothing and can
+never break anything, at any order, which the tests check across denominators.
+
+Searching the rational shifts one denominator at a time:
+
+| denominator | shifts that close it |
+|---|---|
+| 2 | none |
+| 3 | none |
+| 4 | `(1/4, 1/4)` and `(3/4, 3/4)`, both at order 4 |
+| 5, 6 | none |
+
+Halves and thirds do nothing at all. The answer is `v = (1/4, 1/4)`, and it is
+forced rather than chosen: `<v,v>/2 = 1/16` is precisely the gap between
+`a_L = 1` and `a_R = 15/16` that the rotation left behind, so `E_L = E_R`
+exactly.
+
+**And it acts freely.** `(1 - Omega) x = v` has no solution modulo the lattice —
+the obstruction is `w + n = 1/2`, not an integer — so the twisted sector is
+stuck to nothing. That is how a shift breaks supersymmetry without leaving a
+fixed point behind, and `is_freely_acting` decides it from the integer columns
+of `sum_k (Omega^T)^k`, which span the obstruction exactly.
+
+Across the backgrounds, with quarters:
+
+| background | asymmetric | failing | repairable | order raised | order kept |
+|---|---|---|---|---|---|
+| self-dual `S^1` | 2 | 2 | 2 | 4 | 0 |
+| half self-dual `T^2` | 4 | 4 | 4 | 232 | 12 |
+| self-dual `T^2` | 24 | 18 | 10 | 728 | 24 |
+
+Not everything is rescued by quarters, and the search says so rather than
+guessing. Most repairs raise the order — the shift has to work its way back onto
+the lattice — but not all of them do, which is why the last two columns are
+counted rather than asserted.
 
 **Discrete torsion: the phases the blocks may carry** —
 `stringsim.compactification.torsion`. The partition function is a sum over pairs
@@ -1131,6 +1181,7 @@ needed. `examples/` produces:
 | `matrix_worldlines.png` | four D0-branes meeting, and leaving unpredictably |
 | `matrix_scattering.gif` | the same, with the string energy beside it |
 | `lyapunov.png` | exponential separation, and its `E^(1/4)` scaling |
+| `shift_landscape.png` | which shift repairs a twist that fails on its own |
 | `fermion_reflection.png` | a pulse bouncing: NS colours alternate, R do not |
 | `fermion_reflection.gif` | the same pulse, moving -- and coming back upside down in NS |
 | `brane_separation.png` | levels rising as branes separate |
@@ -1159,6 +1210,7 @@ python examples/15_one_loop.py                # modular invariance, no ultraviol
 python examples/16_myers_effect.py            # matrices, the fuzzy sphere, 1 - 1/N^2
 python examples/17_hodge_numbers.py           # (51, 3) <-> (3, 51), from fixed points
 python examples/18_matrix_model.py            # D0-brane dynamics, strings, chaos
+python examples/19_shifts.py                  # the shift that repairs T-duality
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -1171,7 +1223,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-849 checks, about 70 seconds. They are cross-checks rather than regression
+878 checks, about 70 seconds. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
@@ -1225,11 +1277,12 @@ wrong, not merely if the code changed. A representative sample:
   side the non-abelian potential is the leading commutator terms only, and the
   Chern-Simons normalisation is folded into the flux parameter.
 * **Twisted spectra of asymmetric orbifolds.** The candidate twists are
-  enumerated and the consistency conditions applied to them, but the states
-  themselves are not built and shifts are not implemented. Hodge numbers are
-  computed for abelian orbifolds of `T^6` with the one-modulus-per-locus rule;
-  non-abelian groups, overlapping loci and the resolution itself are not, and
-  curved compactifications are out of scope entirely.
+  enumerated, shifts are searched for and the consistency conditions applied, and
+  the twisted ground-state energies and degeneracies come out -- but the states
+  above them are not built. Hodge numbers are computed for abelian orbifolds of
+  `T^6` with the one-modulus-per-locus rule; non-abelian groups, overlapping loci
+  and the resolution itself are not, and curved compactifications are out of
+  scope entirely.
 * **Higher genus, and amplitudes with insertions.** The one-loop vacuum diagram
   and its moduli space are computed; two loops, vertex operators on the torus,
   and the annulus with different branes at the two ends are not.

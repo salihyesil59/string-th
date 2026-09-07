@@ -42,6 +42,7 @@ __all__ = [
     "plot_fixed_loci",
     "plot_matrix_worldlines",
     "plot_lyapunov",
+    "plot_shift_landscape",
 ]
 
 FUNDAMENTAL_DOMAIN_FLOOR = math.sqrt(3.0) / 2.0
@@ -1068,4 +1069,43 @@ def plot_lyapunov(fit, energies, exponents, power, path, title: str | None = Non
     ax2.legend(loc="upper left", fontsize=9)
     if title:
         fig.suptitle(title, fontsize=11)
+    return _save(fig, path)
+
+
+def plot_shift_landscape(
+    first, second, mismatch, marked, path, title: str | None = None
+) -> Path:
+    r"""The ground-state mismatch over the square of shifts, and what closes it.
+
+    ``first`` and ``second`` are the two components of the shift on ``[0, 1)``,
+    ``mismatch`` the array of ``E_L - E_R`` there, and ``marked`` a sequence of
+    ``(w, n, level_matched)`` for the rational shifts that actually close into a
+    finite-order element.
+
+    Most of the square is unreachable: a shift has to be rational for the twist
+    to have an order at all, so only the lattice points count.  Of those, only
+    the ones where ``N (E_L - E_R)`` is an integer give a consistent orbifold --
+    the filled markers.  The background is smooth and says nothing on its own;
+    the arithmetic on top of it is the whole content.
+    """
+    marked = list(marked)
+    fig, ax = _fig(figsize=(6.6, 5.2))
+    image = ax.pcolormesh(first, second, mismatch, cmap="RdBu_r", shading="auto")
+    fig.colorbar(image, ax=ax, label=r"$E_L - E_R$")
+    for horizontal, vertical, matched in marked:
+        ax.plot(
+            [horizontal],
+            [vertical],
+            "o" if matched else "x",
+            ms=10 if matched else 7,
+            mew=2.0,
+            color="k" if matched else "0.4",
+            markerfacecolor="k" if matched else "none",
+        )
+    ax.plot([], [], "o", ms=8, color="k", label="closes and level-matches")
+    ax.plot([], [], "x", ms=7, mew=2.0, color="0.4", label="closes but does not")
+    ax.set_xlabel("shift in $w$")
+    ax.set_ylabel("shift in $n$")
+    ax.set_title(title or "Which shift repairs a twist that fails on its own")
+    ax.legend(loc="upper right", fontsize=9)
     return _save(fig, path)
