@@ -25,7 +25,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 688 checks
+python -m pytest                          # 780 checks
 ```
 
 ---
@@ -826,6 +826,76 @@ Everything is evaluated through `gammaln`/`gammasgn`, not `gamma`: at
 `veneziano_log_abs` is the only honest way to look at it.
 
 
+
+**With N branes the positions are matrices, and a flux makes them refuse to
+commute** — `stringsim.branes.myers`. Section 8's `U(N)` says the transverse
+coordinates are `N x N` Hermitian matrices; give them the potential a background
+Ramond-Ramond flux induces,
+
+```
+V = Tr( -1/4 [Phi_i,Phi_j][Phi_i,Phi_j] + (i f/3) eps_ijk Phi_i Phi_j Phi_k )
+```
+
+and the two terms disagree. The quartic one wants `[Phi_i, Phi_j] = 0` —
+ordinary separated branes, at `V = 0`. The cubic one does not.
+
+**An SU(2) representation wins.** `Phi_i = alpha J_i` gives
+`V = Tr(J^2)(alpha^4/2 - f alpha^3/3)`, minimised at `alpha = f/2` with
+`V = -f^4 Tr(J^2)/96`, and it solves the *full* matrix equations of motion, not
+just the equations restricted to the ansatz (residual `1e-14`; scale one matrix
+by 1.3 and it becomes `0.45`). Since the depth goes like `Tr(J^2)`, and a split
+into blocks of sizes `N_a` gives `sum N_a(N_a^2-1)/4`, the question becomes
+arithmetic — and `configuration_energies` settles it by enumerating every
+partition:
+
+```
+N = 8   (22 partitions)
+  (8,)                V = -10.962131   Tr J^2 = 126.00   R = 3.3733
+  (7, 1)              V =  -7.308087   Tr J^2 =  84.00   R = 2.7543
+  (6, 2)              V =  -4.698056   Tr J^2 =  54.00   R = 2.2084
+  ...
+  (1,1,1,1,1,1,1,1)   V =  +0.000000   Tr J^2 =   0.00   R = 0.0000
+```
+
+One block always wins, and `N` commuting matrices — what one would have called
+the vacuum — sit at exactly zero, at the top.
+`figures/myers_landscape.png` is all 42 partitions of 10 at once.
+
+**And the single block is a sphere.** `R = (f/4) sqrt(N^2-1)`, so `R/N -> f/4`,
+while `|[Phi,Phi]| / R^2` falls like `1/N`:
+
+| `N` | `R` | `R/N` | `|[Phi,Phi]|/R^2` | latitudes |
+|---|---|---|---|---|
+| 2 | 0.73612 | 0.36806 | 0.66667 | 2 |
+| 12 | 5.08226 | 0.42352 | 0.15385 | 12 |
+| 80 | 33.99734 | 0.42497 | 0.02469 | 80 |
+
+`latitudes` returns what the sphere is actually made of: the eigenvalues of
+`Phi_3`, evenly spaced by `f/2`, each carrying a circle of radius
+`sqrt(R^2 - z^2)`. There is nothing between them. `figures/fuzzy_sphere.png` and
+`figures/fuzzy_sphere.gif` show `N` circles becoming a surface, which is the
+same statement as the commutators shrinking.
+
+**The other description, checked with nothing fitted.** That object is a
+spherical D2-brane with `N` units of flux, whose Born-Infeld energy is
+`4 pi T_2 sqrt(R^4 + pi^2 alpha'^2 N^2)`. Shrink it to a point:
+
+```
+N = 100:  E(R=0) = 333.3333333333    N T_0 = 333.3333333333    relative 0e+00
+```
+
+`4 pi^2 alpha' T_2 = T_0` comes straight out of the tension formula, so **a
+shrunk D2-brane carrying N flux quanta is N D0-branes** — which is why the two
+pictures are of one object. Where they differ is the payoff: the continuum knows
+only `N^3`, the matrices give `N(N^2-1)`, so
+
+```
+V_matrix / V_continuum = 1 - 1/N^2
+```
+
+exactly. It is the price of building a sphere out of `N` points, and it is the
+leading correction the D2-brane description cannot see.
+
 **At one loop the answer is the shape of the integration region** —
 `stringsim.amplitudes.oneloop`. The worldsheet is a torus, and
 
@@ -925,6 +995,8 @@ needed. `examples/` produces:
 | `modular_reduction.gif` | a point walking out of the would-be ultraviolet |
 | `one_loop_integrand.png` | the infrared growth, and the tachyon mass in its slope |
 | `channel_duality.png` | an open loop and a closed exchange, on top of each other |
+| `fuzzy_sphere.png`, `fuzzy_sphere.gif` | N D0-branes assembling into a sphere |
+| `myers_landscape.png` | every way of splitting N branes, and what each costs |
 | `fermion_reflection.png` | a pulse bouncing: NS colours alternate, R do not |
 | `fermion_reflection.gif` | the same pulse, moving -- and coming back upside down in NS |
 | `brane_separation.png` | levels rising as branes separate |
@@ -950,6 +1022,7 @@ python examples/12_worldsheet_fermions.py      # fermion transport, reflection, 
 python examples/13_asymmetric_and_torsion.py   # non-geometric twists, epsilon(g,h)
 python examples/14_dbi_and_m_theory.py         # DBI, the BIon spike, M2/M5
 python examples/15_one_loop.py                # modular invariance, no ultraviolet
+python examples/16_myers_effect.py            # matrices, the fuzzy sphere, 1 - 1/N^2
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -962,7 +1035,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-688 checks, about 90 seconds. They are cross-checks rather than regression
+780 checks, about 85 seconds. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
@@ -1010,8 +1083,10 @@ wrong, not merely if the code changed. A representative sample:
 * **Eleven-dimensional dynamics.** The M2/M5 tensions and their reductions are
   computed, but the supergravity fields, the M5 worldvolume theory and the
   Matrix-model definition are not; `mtheory` is a dictionary and its consistency
-  conditions. On the brane side the DBI action is there, but only for one
-  transverse scalar and an abelian gauge field -- no non-abelian Myers terms.
+  conditions. On the brane side the non-abelian potential is the leading
+  commutator terms only -- the full non-abelian DBI is not unambiguously
+  defined -- and the Chern-Simons normalisation is folded into the flux
+  parameter rather than derived.
 * **Twisted spectra of asymmetric orbifolds, and Hodge numbers.** The candidate
   twists are enumerated and the consistency conditions applied to them, and the
   discrete-torsion phases are derived — but the states themselves are not built,

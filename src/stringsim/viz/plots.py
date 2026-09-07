@@ -36,6 +36,8 @@ __all__ = [
     "plot_fundamental_domain",
     "plot_one_loop_integrand",
     "plot_channel_duality",
+    "plot_fuzzy_sphere",
+    "plot_myers_landscape",
 ]
 
 FUNDAMENTAL_DOMAIN_FLOOR = math.sqrt(3.0) / 2.0
@@ -820,4 +822,101 @@ def plot_channel_duality(moduli, open_channel, closed_channel, path, title=None)
     _decade_ticks(ax2, moduli)
     if title:
         fig.suptitle(title, fontsize=11)
+    return _save(fig, path)
+
+
+def _sphere_scale(heights, radii) -> float:
+    """The radius to normalise a fuzzy sphere by, so panels are comparable."""
+    reach = max(float(np.max(np.abs(heights))), float(np.max(radii)))
+    return reach if reach > 0.0 else 1.0
+
+
+def plot_fuzzy_sphere(entries, path, title: str | None = None) -> Path:
+    r"""A fuzzy sphere is a stack of circles, and only that.
+
+    ``entries`` is a sequence of ``(label, heights, radii)``, one per panel:
+    the eigenvalues of ``Phi_3`` and the circle radius at each, from
+    :func:`stringsim.branes.myers.latitudes`.
+
+    There is nothing between the circles.  ``N`` D0-branes in a flux have become
+    a two-dimensional object made of ``N`` latitudes, and it only looks like a
+    sphere once ``N`` is large -- which is the same statement as the commutators
+    shrinking relative to the radius.
+
+    Each panel is drawn at its own scale.  The physical radius grows like ``N``,
+    so on a shared axis the small spheres shrink to dots and the thing the
+    picture is about -- how many circles there are -- disappears.  Put the
+    radius in the label.
+    """
+    import matplotlib.pyplot as plt
+
+    entries = list(entries)
+    if not entries:
+        raise ValueError("give at least one (label, heights, radii) triple")
+    # Each panel is scaled to its own radius: the sphere grows like N, and at a
+    # shared absolute scale the small ones become invisible dots.  What the
+    # picture is for is the *filling in*, so the size goes in the label instead.
+    entries = [
+        (label, np.asarray(z) / _sphere_scale(z, r), np.asarray(r) / _sphere_scale(z, r))
+        for label, z, r in entries
+    ]
+    reach = 1.05
+    angle = np.linspace(0.0, 2.0 * np.pi, 200)
+    with plt.rc_context(_STYLE):
+        fig = plt.figure(figsize=(3.9 * len(entries), 4.0), dpi=130)
+        for index, (label, heights, radii) in enumerate(entries):
+            ax = fig.add_subplot(1, len(entries), index + 1, projection="3d")
+            for height, radius in zip(np.asarray(heights), np.asarray(radii), strict=True):
+                ax.plot(
+                    radius * np.cos(angle),
+                    radius * np.sin(angle),
+                    np.full_like(angle, height),
+                    lw=1.6,
+                    color="tab:blue",
+                    alpha=0.85,
+                )
+            ax.set_xlim(-reach, reach)
+            ax.set_ylim(-reach, reach)
+            ax.set_zlim(-reach, reach)
+            ax.set_box_aspect((1, 1, 1))
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_zticks([])
+            ax.set_title(label, fontsize=10)
+            ax.view_init(elev=18.0, azim=-62.0)
+        fig.suptitle(title or "N D0-branes, drawn as the sphere they became", fontsize=11)
+    return _save(fig, path)
+
+
+def plot_myers_landscape(configurations, path, title: str | None = None) -> Path:
+    """Every way of splitting N branes into blocks, and what each costs.
+
+    ``configurations`` is a sequence of
+    :class:`stringsim.branes.myers.Configuration`.  The single block sits at the
+    bottom; ``(1, 1, ..., 1)`` -- commuting matrices, the configuration one
+    would have called the vacuum -- sits at zero, at the top of the picture.
+
+    The depth tracks ``sum N_a (N_a^2 - 1)``, which is why one big block beats
+    every way of dividing the branes up.
+    """
+    entries = list(configurations)
+    if not entries:
+        raise ValueError("give at least one configuration")
+    order = np.argsort([entry.energy for entry in entries])
+    energies = np.array([entries[i].energy for i in order])
+    labels = ["+".join(str(size) for size in entries[i].partition) for i in order]
+    colours = ["tab:orange" if entries[i].is_irreducible else "tab:blue" for i in order]
+
+    fig, ax = _fig(figsize=(max(6.4, 0.42 * len(entries) + 2.0), 4.4))
+    positions = np.arange(len(entries))
+    ax.bar(positions, energies, color=colours)
+    ax.axhline(0.0, color="0.4", lw=0.9)
+    ax.set_xticks(positions)
+    ax.set_xticklabels(labels, rotation=90, fontsize=7)
+    ax.set_xlabel("block sizes")
+    ax.set_ylabel("$V$")
+    ax.set_title(title or "One block beats every way of dividing the branes up")
+    ax.plot([], [], "s", color="tab:orange", label="a single fuzzy sphere")
+    ax.plot([], [], "s", color="tab:blue", label="split into blocks")
+    ax.legend(loc="lower right", fontsize=9)
     return _save(fig, path)
