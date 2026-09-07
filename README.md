@@ -25,7 +25,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 467 checks
+python -m pytest                          # 576 checks
 ```
 
 ---
@@ -333,6 +333,89 @@ quoting it.
 state: `a_k` never lands on the level lattice, so every twisted level is either
 tachyonic or massive. The bosonic string keeps its instability, and the
 quotient does not cure it.
+
+**A twist need not act on space at all** — `stringsim.compactification.asymmetric`.
+On the Narain lattice a twist is any `Omega` in `O(d,d;Z)` that also fixes the
+moduli, and because it preserves `eta` and `H` it preserves `l_L^2` and `l_R^2`
+separately: in the momentum frame it is a *pair* of rotations `(R_L, R_R)`. When
+those differ there is no motion of the torus that produces it. The test is
+sharp — with `Z = (w, n)` a diffeomorphism sends `w -> A w` and a `B`-shift
+touches only the momentum, so both leave the upper-right block of `Omega` zero,
+and T-duality is precisely the statement that it does not.
+
+`H` is positive definite, so the automorphism group is **finite and searchable**
+by backtracking over images of basis vectors:
+
+| background | `|Aut|` | geometric | asymmetric | level-matched | left algebra |
+|---|---|---|---|---|---|
+| generic `S^1` | 2 | 2 | 0 | — | `u(1)` |
+| self-dual `S^1` | 4 | 2 | 2 | 0 | `su(2)` |
+| hexagonal `T^2` | 12 | 12 | 0 | — | `u(1)^2` |
+| half self-dual `T^2` | 8 | 4 | 4 | 0 | `su(2) + u(1)` |
+| self-dual `T^2` | 32 | 8 | 24 | 6 | `su(2)^2` |
+| self-dual `T^3` | 384 | 48 | 336 | 84 | `su(2)^3` |
+
+At the fully self-dual `T^d` that is `2^(2d) d!` with a geometric subgroup of
+`2^d d!` — the signed permutations, `Aut` of `Z^d` itself. **Asymmetric twists
+exist exactly where the gauge symmetry is enhanced**: no roots, no asymmetry, and
+the ratio `|Aut| / |Aut_geom|` is the order of one side's Weyl group.
+
+**Level matching decides which of them are usable.** A twisted sector needs
+`L_0 - L_0bar` quantised in units of `1/N`, so `N (a_R - a_L)` must be an
+integer, with the intercepts built from the phases exactly as the symmetric
+machinery builds its own. Across every background above the condition holds
+**precisely when the two phase multisets agree** — the left and right rotations
+may be different rotations, but they must turn by the same angles. That came out
+of the enumeration and the tests re-derive it rather than trusting it. A
+geometric twist has `a_L = a_R` identically and so can never fail; the
+self-dual circle's T-duality twist has `a_L = 1`, `a_R = 15/16` and misses by
+`1/8`, which is why that orbifold needs a shift.
+
+For the survivors `|det(1 - Omega)|` is always a perfect square, and its root is
+the twisted-sector degeneracy — left- and right-movers each supply half of the
+fixed-point count on the Narain lattice:
+
+```
+self-dual T^2   order 4   phi = (1/4, 3/4)        |det(1-Omega)| = 4    degeneracy 2
+self-dual T^3   order 4   phi = (1/4, 1/2, 3/4)                   16               4
+self-dual T^3   order 6   phi = (1/6, 1/2, 5/6)                    4               2
+```
+
+**Discrete torsion: the phases the blocks may carry** —
+`stringsim.compactification.torsion`. The partition function is a sum over pairs
+of commuting elements, `Z = (1/|G|) sum eps(g,h) Z[g,h]`, and the modular group
+moves the blocks around: `T` sends `Z[g,h]` to `Z[g,gh]` and `S` sends it to
+`Z[h,g^-1]`. Surviving both, plus the factorisation that sewing demands, leaves
+exactly the alternating bilinear pairings. Enumerated over candidate generator
+values and filtered by the axioms:
+
+| group | pairings found | `prod gcd(N_i, N_j)` |
+|---|---|---|
+| `Z_2`, `Z_6` | 1 | 1 |
+| `Z_2 x Z_2` | 2 | 2 |
+| `Z_2 x Z_4` | 2 | 2 |
+| `Z_3 x Z_3` | 3 | 3 |
+| `Z_2 x Z_2 x Z_2` | 8 | 8 |
+
+so `H^2(G, U(1)) = sum_{i<j} Z_gcd(N_i,N_j)`, derived rather than quoted, and
+**a cyclic orbifold has no discrete torsion at all** — every `Z_N` in the table
+above had no choice to make.
+
+What the phase does: in the `g`-twisted sector the projector becomes
+`(1/|G|) sum_h eps(g,h) h`. The untwisted sector never moves, since
+`eps(1,h) = 1`. For `Z_2 x Z_2` on `T^4` the weights become `(1, 1, -1, -1)` and
+the two projections keep complementary halves — their sum is the projection by
+`<g>` alone, level by level:
+
+```
+g1-twisted   no torsion  1  0  3  0  12  0  35  0   97  0  247
+             torsion     0  0  2  0   8  0  30  0   88  0  234
+             sum         1  0  5  0  20  0  65  0  185  0  481   = the <g> projection
+```
+
+These are oscillator counts. The fixed-point multiplicities and the phases the
+group acts with on them are not included, so this is the mechanism behind
+`(h11, h21) = (51, 3) <-> (3, 51)` rather than that number itself.
 
 ### 6. The superstring: worldsheet fermions and GSO — `stringsim.superstring`
 
@@ -689,6 +772,7 @@ needed. `examples/` produces:
 | `heterotic_roots.png` | root connectivity: two blocks against one |
 | `wilson_breaking.png` | the same picture before and after a Wilson line |
 | `wilson_enhancement.png` | where in the (Wilson line, radius) plane the group grows |
+| `asymmetric_orbifolds.png` | how each background's symmetries split, and what survives |
 | `fermion_reflection.png` | a pulse bouncing: NS colours alternate, R do not |
 | `brane_separation.png` | levels rising as branes separate |
 | `veneziano.png` | the amplitude and its poles |
@@ -710,6 +794,7 @@ python examples/09_superstring.py         # NS and R, GSO, type IIA/IIB, which b
 python examples/10_heterotic.py           # the two lattices, 496, and no tachyon
 python examples/11_heterotic_compactified.py   # Gamma_{16+d,d}, Wilson lines, enhancement
 python examples/12_worldsheet_fermions.py      # fermion transport, reflection, sectors
+python examples/13_asymmetric_and_torsion.py   # non-geometric twists, epsilon(g,h)
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -722,7 +807,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-467 checks, about 70 seconds. They are cross-checks rather than regression
+576 checks, about 80 seconds. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
@@ -770,9 +855,11 @@ wrong, not merely if the code changed. A representative sample:
 * **M-theory and branes beyond Dp.** M2/M5 branes, the eleven-dimensional
   picture and the DBI action are absent; `branes/` covers the tension, the
   stretched-string spectrum and the gauge group only.
-* **Calabi–Yau compactification.** The torus and its `Z_N` orbifolds are
-  implemented; discrete torsion, asymmetric orbifolds and curved
-  compactifications are not.
+* **Twisted spectra of asymmetric orbifolds, and Hodge numbers.** The candidate
+  twists are enumerated and the consistency conditions applied to them, and the
+  discrete-torsion phases are derived — but the states themselves are not built,
+  shifts are not implemented, and the fixed-point data a Hodge number needs is
+  absent. Curved compactifications are out of scope entirely.
 * **Interacting worldsheets.** Amplitudes are the known closed forms, not a
   moduli-space integral; there is no genus expansion and no loop calculation.
 
