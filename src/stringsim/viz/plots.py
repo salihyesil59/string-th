@@ -33,7 +33,12 @@ __all__ = [
     "plot_twist_classification",
     "plot_dbi_field",
     "plot_bion_spike",
+    "plot_fundamental_domain",
+    "plot_one_loop_integrand",
+    "plot_channel_duality",
 ]
+
+FUNDAMENTAL_DOMAIN_FLOOR = math.sqrt(3.0) / 2.0
 
 _STYLE = {
     "figure.figsize": (7.2, 4.6),
@@ -677,4 +682,142 @@ def plot_bion_spike(
             ax.set_title(label, fontsize=10)
             ax.view_init(elev=24.0, azim=-58.0)
         fig.suptitle(title or "A string, seen from the brane it ends on", fontsize=11)
+    return _save(fig, path)
+
+
+def plot_fundamental_domain(images, path, points=(), links=(), title: str | None = None) -> Path:
+    r"""The fundamental domain of ``SL(2,Z)`` and its images tiling the plane.
+
+    ``images`` is a sequence of arrays of complex numbers, each the boundary of
+    one image of the domain; ``points`` is a sequence of ``(label, tau)`` pairs
+    to mark, and ``links`` a sequence of ``(start, end)`` pairs drawn as arrows
+    from a point to its representative.
+
+    The shaded region is where the one-loop integral is taken.  Everything below
+    it -- the whole strip ``tau_2 -> 0`` that a field theory would integrate over
+    and diverge on -- is *already counted*: it is a copy of the domain, reached
+    by a modular transformation.  There is no ultraviolet region to regulate
+    because there is no ultraviolet region.
+    """
+    entries = [np.asarray(image, dtype=complex) for image in images]
+    if not entries:
+        raise ValueError("give at least one image of the domain")
+    fig, ax = _fig(figsize=(7.6, 5.4))
+    for index, image in enumerate(entries):
+        ax.fill(
+            image.real,
+            image.imag,
+            facecolor="tab:blue" if index == 0 else "0.88",
+            edgecolor="0.45",
+            lw=0.7,
+            alpha=0.55 if index == 0 else 0.9,
+            zorder=2 if index == 0 else 1,
+        )
+    for start, end in links:
+        start, end = complex(start), complex(end)
+        ax.annotate(
+            "",
+            xy=(end.real, end.imag),
+            xytext=(start.real, start.imag),
+            arrowprops={"arrowstyle": "->", "color": "tab:red", "lw": 1.2, "alpha": 0.8},
+            zorder=3,
+        )
+    for label, tau in points:
+        tau = complex(tau)
+        ax.plot([tau.real], [tau.imag], "o", ms=7, color="tab:red", zorder=4)
+        ax.annotate(
+            label,
+            (tau.real, tau.imag),
+            textcoords="offset points",
+            xytext=(9, 5),
+            fontsize=8,
+            color="tab:red",
+            zorder=5,
+        )
+    ax.axhline(FUNDAMENTAL_DOMAIN_FLOOR, color="tab:red", ls=":", lw=1.1)
+    ax.text(
+        -1.55,
+        FUNDAMENTAL_DOMAIN_FLOOR + 0.04,
+        r"$\tau_2 = \sqrt{3}/2$",
+        fontsize=9,
+        color="tab:red",
+    )
+    ax.set_xlim(-1.6, 1.6)
+    ax.set_ylim(0.0, 2.2)
+    ax.set_xlabel(r"$\tau_1$")
+    ax.set_ylabel(r"$\tau_2$")
+    ax.set_title(title or "The integral is taken once, over the shaded region only")
+    return _save(fig, path)
+
+
+def plot_one_loop_integrand(heights, values, fitted, path, title: str | None = None) -> Path:
+    r"""The torus integrand along the imaginary axis, and what its growth means.
+
+    ``heights`` are values of ``tau_2``, ``values`` the integrand there and
+    ``fitted`` the two-parameter model ``exp(-pi alpha' M^2 tau_2) tau_2^b``.
+
+    The rise is not a failure of the calculation.  It is the tachyon: the
+    lightest closed string has ``alpha' M^2 = -4``, so the trace grows like
+    ``e^{4 pi tau_2}``, and reading that slope off the curve is a measurement of
+    a mass from an amplitude.
+    """
+    heights = np.asarray(heights, dtype=float)
+    fig, ax = _fig(figsize=(7.2, 4.6))
+    ax.semilogy(heights, values, "o", ms=4, color="tab:blue", label="integrand")
+    ax.semilogy(heights, fitted, "-", lw=1.8, color="tab:red", label="fitted growth")
+    ax.set_xlabel(r"$\tau_2$")
+    ax.set_ylabel("integrand")
+    ax.set_title(title or r"Infrared growth: the tachyon, at $\alpha' M^2 = -4$")
+    ax.legend(loc="upper left", fontsize=9)
+    return _save(fig, path)
+
+
+def _decade_ticks(ax, values) -> None:
+    """Readable ticks on a log axis that spans less than two decades.
+
+    Matplotlib's minor labels collide badly over a short log range, which is
+    exactly the range these figures use.
+    """
+    from matplotlib.ticker import FixedFormatter, FixedLocator, NullFormatter
+
+    values = np.asarray(values, dtype=float)
+    ticks = [t for t in (0.25, 0.5, 1.0, 2.0, 4.0, 8.0) if values.min() <= t <= values.max()]
+    if not ticks:
+        return
+    ax.xaxis.set_major_locator(FixedLocator(ticks))
+    ax.xaxis.set_major_formatter(FixedFormatter([f"{t:g}" for t in ticks]))
+    ax.xaxis.set_minor_formatter(NullFormatter())
+
+
+def plot_channel_duality(moduli, open_channel, closed_channel, path, title=None) -> Path:
+    """One diagram in two languages: an open loop and a closed exchange.
+
+    ``moduli`` are values of the open-string modulus ``t``; ``open_channel`` is
+    the integrand there and ``closed_channel`` the same quantity computed from
+    the closed-string formula at ``s = 1/t``.  The curves lie on top of each
+    other because ``eta(i/t) = sqrt(t) eta(it)``, which is why a one-loop
+    open-string diagram is a statement about gravity.
+    """
+    moduli = np.asarray(moduli, dtype=float)
+    fig, (ax, ax2) = _fig(1, 2, figsize=(10.6, 4.4))
+    ax.loglog(moduli, open_channel, lw=3.0, color="tab:blue", alpha=0.5, label="open loop, $t$")
+    ax.loglog(
+        moduli, closed_channel, lw=1.4, ls="--", color="tab:orange",
+        label="closed exchange, $s = 1/t$",
+    )
+    ax.set_xlabel("$t$")
+    ax.set_ylabel("integrand")
+    ax.set_title("the same function, twice")
+    ax.legend(loc="upper center", fontsize=9)
+    _decade_ticks(ax, moduli)
+
+    relative = np.abs(np.asarray(open_channel) / np.asarray(closed_channel) - 1.0)
+    ax2.loglog(moduli, np.maximum(relative, 1e-18), lw=1.8, color="tab:blue")
+    ax2.set_xlabel("$t$")
+    ax2.set_ylabel("relative difference")
+    ax2.set_ylim(1e-18, 1.0)
+    ax2.set_title("and it is the same to machine precision")
+    _decade_ticks(ax2, moduli)
+    if title:
+        fig.suptitle(title, fontsize=11)
     return _save(fig, path)
