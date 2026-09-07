@@ -33,6 +33,7 @@ __all__ = [
     "animate_twisted_string",
     "animate_bion_spike",
     "animate_modular_reduction",
+    "animate_fuzzy_sphere",
 ]
 
 
@@ -509,4 +510,67 @@ def animate_modular_reduction(
         return path_line, current
 
     anim = FuncAnimation(fig, update, frames=frames, blit=False)
+    return _save_animation(anim, fig, path, fps)
+
+
+def _sphere_scale(heights, radii) -> float:
+    """The radius to normalise a fuzzy sphere by, so panels are comparable."""
+    reach = max(float(np.max(np.abs(heights))), float(np.max(radii)))
+    return reach if reach > 0.0 else 1.0
+
+
+def animate_fuzzy_sphere(frames, path, hold: int = 7, fps: int = 10, title=None) -> Path:
+    r"""Watch a sphere assemble itself out of D0-branes as ``N`` grows.
+
+    ``frames`` is a sequence of ``(label, heights, radii)`` from
+    :func:`stringsim.branes.myers.latitudes`, one per value of ``N``.  Each is a
+    genuine solution of the matrix equations of motion, not an interpolation:
+    the flux quantum is an integer, so the family is discrete.
+
+    Two things happen at once, and they are the same thing.  The circles get
+    more numerous, so the surface fills in; and the radius grows like ``N``
+    while the commutators grow like ``N``, so their *relative* size falls like
+    ``1/N`` and the noncommutative sphere turns into an ordinary one.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
+
+    entries = list(frames)
+    if not entries:
+        raise ValueError("give at least one (label, heights, radii) triple")
+    entries = [
+        (label, np.asarray(z) / _sphere_scale(z, r), np.asarray(r) / _sphere_scale(z, r))
+        for label, z, r in entries
+    ]
+    reach = 1.05
+    angle = np.linspace(0.0, 2.0 * np.pi, 200)
+
+    fig = plt.figure(figsize=(5.2, 5.0), dpi=110)
+    ax = fig.add_subplot(111, projection="3d")
+    total = len(entries) * hold
+
+    def update(index: int):
+        label, heights, radii = entries[min(index // hold, len(entries) - 1)]
+        ax.clear()
+        for height, radius in zip(np.asarray(heights), np.asarray(radii), strict=True):
+            ax.plot(
+                radius * np.cos(angle),
+                radius * np.sin(angle),
+                np.full_like(angle, height),
+                lw=1.5,
+                color="tab:blue",
+                alpha=0.85,
+            )
+        ax.set_xlim(-reach, reach)
+        ax.set_ylim(-reach, reach)
+        ax.set_zlim(-reach, reach)
+        ax.set_box_aspect((1, 1, 1))
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_zticks([])
+        ax.view_init(elev=18.0, azim=-62.0 + 300.0 * index / max(total - 1, 1))
+        ax.set_title(f"{title or 'the fuzzy sphere fills in'}\n{label}", fontsize=10)
+        return ()
+
+    anim = FuncAnimation(fig, update, frames=total, blit=False)
     return _save_animation(anim, fig, path, fps)
