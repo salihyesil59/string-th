@@ -19,9 +19,18 @@ from stringsim.compactification.circle import self_dual_radius  # noqa: E402
 from stringsim.compactification.torus import TorusBackground  # noqa: E402
 from stringsim.quantum.partition import fit_hagedorn, oscillator_degeneracies  # noqa: E402
 from stringsim.quantum.spectrum import open_bosonic_spectrum  # noqa: E402
-from stringsim.viz.animate import animate_evolution, animate_modes, snapshot_grid  # noqa: E402
+from stringsim.viz.animate import (  # noqa: E402
+    animate_bion_spike,
+    animate_evolution,
+    animate_fermion_reflection,
+    animate_modes,
+    animate_twisted_string,
+    snapshot_grid,
+)
 from stringsim.viz.plots import (  # noqa: E402
+    plot_bion_spike,
     plot_brane_separation,
+    plot_dbi_field,
     plot_degeneracy_growth,
     plot_mass_spectrum,
     plot_mode_spectrum,
@@ -196,3 +205,50 @@ def test_root_connectivity_plot(tmp_path):
     ).exists()
     with pytest.raises(ValueError):
         plot_root_connectivity([], tmp_path / "empty.png")
+
+
+def test_the_new_static_plots_write_files(tmp_path):
+    charges = np.linspace(0.0, 4.0, 60)
+    assert plot_dbi_field(
+        charges,
+        np.sqrt(1.0 + charges**2) - 1.0,
+        0.5 * charges**2,
+        charges / np.sqrt(1.0 + charges**2),
+        tmp_path / "dbi.png",
+    ).exists()
+    assert plot_bion_spike(
+        [("n = 1", lambda r: 1.0 / r), ("n = 2", lambda r: 2.0 / r)],
+        tmp_path / "spike.png",
+        n_grid=24,
+        extent=0.5,
+    ).exists()
+
+
+def test_the_new_animations_write_files(tmp_path):
+    from stringsim.superstring.rns import Sector
+    from stringsim.superstring.worldsheet import evolve_open_fermion, fold, sector_twist
+
+    n_points = 32
+    sigma = np.arange(n_points) * (2.0 * np.pi / n_points)
+    bump = np.exp(-(((sigma - 0.5 * np.pi) / 0.3) ** 2))[:, None]
+    runs = []
+    for sector in (Sector.NS, Sector.R):
+        minus, plus = fold(bump, sector_twist(sector))
+        runs.append(
+            (sector.value, evolve_open_fermion(minus, plus, sector=sector, n_steps=24))
+        )
+    assert animate_fermion_reflection(runs, tmp_path / "fermions.gif", stride=4).exists()
+    assert animate_twisted_string(
+        1.0 / 3.0, tmp_path / "twisted.gif", n_frames=6, n_sigma=40
+    ).exists()
+    assert animate_bion_spike(
+        [("n = 1", lambda r: 1.0 / r)], tmp_path / "spike.gif", n_grid=20, extent=0.5, hold=2
+    ).exists()
+
+
+def test_the_new_visuals_reject_empty_input(tmp_path):
+    for maker in (plot_bion_spike, animate_bion_spike, animate_fermion_reflection):
+        with pytest.raises(ValueError, match="at least one"):
+            maker([], tmp_path / "empty.png")
+    with pytest.raises(ValueError, match="strictly in"):
+        animate_twisted_string(0.0, tmp_path / "bad.gif")

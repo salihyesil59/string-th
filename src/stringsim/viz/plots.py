@@ -31,6 +31,8 @@ __all__ = [
     "plot_fermion_reflection",
     "plot_wilson_enhancement",
     "plot_twist_classification",
+    "plot_dbi_field",
+    "plot_bion_spike",
 ]
 
 _STYLE = {
@@ -583,4 +585,96 @@ def plot_twist_classification(rows, path, title: str | None = None) -> Path:
     ax.grid(axis="y", visible=False)
     ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.01), ncol=3, fontsize=9, frameon=False)
     fig.suptitle(title or "Every symmetry of a generic torus is a motion of it", fontsize=11)
+    return _save(fig, path)
+
+
+def plot_dbi_field(charges, dbi_energy, maxwell_energy, field_ratio, path, title=None) -> Path:
+    r"""What Born-Infeld does that Maxwell does not, in the variable that shows it.
+
+    ``charges`` is the dimensionless displacement ``D``; ``dbi_energy`` and
+    ``maxwell_energy`` are the two energy densities in units of ``T_p``, and
+    ``field_ratio`` is ``E/E_crit`` at that charge.
+
+    Plotted against the *field* the Born-Infeld energy simply diverges, which
+    says nothing interesting.  Against the **charge** the two theories separate
+    properly: Maxwell's energy keeps going like ``D^2``, Born-Infeld's settles
+    into a straight line, and the field it takes to hold that charge stops at
+    ``E_crit = 1/(2 pi alpha')`` however much charge is piled on.  That ceiling
+    is the fundamental string tension: pull on a string endpoint that hard and
+    nothing is left holding it.
+    """
+    charges = np.asarray(charges, dtype=float)
+    fig, (ax, ax2) = _fig(1, 2, figsize=(10.6, 4.4))
+    ax.plot(charges, dbi_energy, lw=2.2, color="tab:blue", label="Born-Infeld")
+    ax.plot(charges, maxwell_energy, lw=1.6, ls="--", color="tab:orange", label="Maxwell")
+    ax.set_xlabel("charge $D$")
+    ax.set_ylabel("energy density / $T_p$")
+    ax.set_ylim(0.0, float(np.max(dbi_energy)) * 3.0)
+    ax.set_title("energy: quadratic against linear")
+    ax.legend(loc="upper left", fontsize=9)
+
+    ax2.plot(charges, field_ratio, lw=2.2, color="tab:blue")
+    ax2.axhline(1.0, color="tab:red", lw=1.2, ls=":", label=r"$E_{\rm crit} = 1/2\pi\alpha'$")
+    ax2.set_xlabel("charge $D$")
+    ax2.set_ylabel(r"$E / E_{\rm crit}$")
+    ax2.set_ylim(0.0, 1.15)
+    ax2.set_title(r"the field it takes never exceeds $E_{\rm crit}$")
+    ax2.legend(loc="lower right", fontsize=9)
+    if title:
+        fig.suptitle(title, fontsize=11)
+    return _save(fig, path)
+
+
+def plot_bion_spike(
+    profiles, path, extent: float = 1.0, n_grid: int = 120,
+    height: float | None = None, title=None,
+) -> Path:
+    r"""The brane's shape where strings end on it, one panel per string number.
+
+    ``profiles`` is a sequence of ``(label, radial_function)``.  Each panel is a
+    two-dimensional slice of the brane, and the spike is the string: far from
+    the endpoint the brane is flat, and near it the transverse position runs
+    away like the harmonic function ``q / r^(p-2)``.
+
+    Every spike is infinitely tall -- ``q/r^(p-2)`` has no ceiling -- so height
+    is not what distinguishes them.  The panels are therefore clipped at a
+    common ``height`` and what varies is the **width of the funnel**: more
+    strings make a wider mouth at the same depth, since ``q`` is proportional to
+    their number.  What is finite, and proportional to ``n``, is the energy per
+    unit height, which is the string tension.
+    """
+    import matplotlib.pyplot as plt
+
+    entries = list(profiles)
+    if not entries:
+        raise ValueError("give at least one (label, profile) pair")
+    axis = np.linspace(-extent, extent, n_grid)
+    grid_x, grid_y = np.meshgrid(axis, axis)
+    radius = np.maximum(np.hypot(grid_x, grid_y), extent / n_grid)
+    surfaces = [np.asarray(fn(radius), dtype=float) for _, fn in entries]
+    ceiling = (
+        float(height)
+        if height is not None
+        else min(float(np.asarray(fn(np.array([extent / 6.0])))[0]) for _, fn in entries)
+    )
+
+    with plt.rc_context(_STYLE):
+        fig = plt.figure(figsize=(4.4 * len(entries), 4.2), dpi=130)
+        for index, ((label, _), surface) in enumerate(zip(entries, surfaces, strict=True)):
+            ax = fig.add_subplot(1, len(entries), index + 1, projection="3d")
+            ax.plot_surface(
+                grid_x,
+                grid_y,
+                np.minimum(surface, ceiling),
+                cmap="viridis",
+                linewidth=0,
+                rstride=1,
+                cstride=1,
+            )
+            ax.set_zlim(0.0, ceiling)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_title(label, fontsize=10)
+            ax.view_init(elev=24.0, azim=-58.0)
+        fig.suptitle(title or "A string, seen from the brane it ends on", fontsize=11)
     return _save(fig, path)

@@ -25,7 +25,14 @@ from pathlib import Path
 
 import numpy as np
 
-__all__ = ["animate_modes", "animate_evolution", "snapshot_grid"]
+__all__ = [
+    "animate_modes",
+    "animate_evolution",
+    "snapshot_grid",
+    "animate_fermion_reflection",
+    "animate_twisted_string",
+    "animate_bion_spike",
+]
 
 
 def _limits(frames: np.ndarray, pad: float = 0.15):
@@ -208,3 +215,217 @@ def snapshot_grid(
     fig.savefig(path)
     plt.close(fig)
     return path
+
+
+def _save_animation(anim, fig, path, fps: int):
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import PillowWriter
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    anim.save(path, writer=PillowWriter(fps=fps))
+    plt.close(fig)
+    return path
+
+
+def animate_fermion_reflection(panels, path, stride: int = 3, fps: int = 20) -> Path:
+    r"""Watch a fermion pulse bounce, and watch the sign it comes back with.
+
+    ``panels`` is a sequence of ``(label, evolution)`` of open-string
+    :class:`stringsim.superstring.worldsheet.FermionEvolution` objects.  Each
+    panel draws both components against ``sigma`` on ``[0, pi]``: ``psi_-``
+    running to the right and ``psi_+`` to the left.
+
+    The pulse leaves through ``sigma = pi`` into ``psi_+`` picking up ``eta``,
+    returns, and re-enters ``psi_-`` unchanged at ``sigma = 0``.  In
+    Neveu-Schwarz it therefore comes back **upside down** and needs a second
+    round trip to be itself again; in Ramond it never flips.  That is the whole
+    reason NS modes are half-integral, running in front of you rather than
+    written down as a boundary condition.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
+
+    entries = list(panels)
+    if not entries:
+        raise ValueError("give at least one (label, evolution) pair")
+    frames = min(len(evolution.tau) for _, evolution in entries) // stride
+
+    fig, axes = plt.subplots(
+        len(entries), 1, figsize=(6.4, 2.5 * len(entries)), dpi=110, sharex=True
+    )
+    axes = np.atleast_1d(axes)
+    scale = 1.15 * max(
+        float(np.max(np.abs(evolution.psi_minus[..., 0]))) for _, evolution in entries
+    )
+    lines = []
+    for ax, (label, evolution) in zip(axes, entries, strict=True):
+        (minus,) = ax.plot([], [], lw=2.2, color="tab:blue", label=r"$\psi_-$ (moves right)")
+        (plus,) = ax.plot([], [], lw=2.2, color="tab:orange", label=r"$\psi_+$ (moves left)")
+        ax.axhline(0.0, color="0.6", lw=0.8)
+        ax.set_xlim(0.0, float(evolution.sigma[-1]))
+        ax.set_ylim(-scale, scale)
+        ax.set_ylabel(label, fontsize=9)
+        ax.grid(alpha=0.25)
+        lines.append((minus, plus, evolution))
+    axes[0].legend(loc="upper right", fontsize=8, ncol=2)
+    axes[-1].set_xlabel(r"$\sigma$")
+    clock = fig.suptitle("")
+
+    def update(index: int):
+        step = index * stride
+        artists = []
+        for minus, plus, evolution in lines:
+            minus.set_data(evolution.sigma, evolution.psi_minus[step, :, 0])
+            plus.set_data(evolution.sigma, evolution.psi_plus[step, :, 0])
+            artists += [minus, plus]
+        tau = lines[0][2].tau[step]
+        clock.set_text(rf"$\tau = {tau:.2f}$   (one round trip every $2\pi$)")
+        return artists
+
+    anim = FuncAnimation(fig, update, frames=frames, blit=False)
+    return _save_animation(anim, fig, path, fps)
+
+
+def animate_twisted_string(
+    phase: float,
+    path,
+    amplitudes=(0.55, 0.25),
+    fixed_point=(0.0, 0.0),
+    n_frames: int = 96,
+    n_sigma: int = 400,
+    fps: int = 20,
+    title: str | None = None,
+) -> Path:
+    r"""A closed string that closes only up to a rotation.
+
+    In a ``theta^k``-twisted sector the string obeys
+    :math:`Z(\sigma + 2\pi) = e^{2\pi i \phi} Z(\sigma)` about a fixed point, so
+    it is built from modes with *fractional* numbers: right-movers
+    :math:`r \in \mathbb{Z} + \phi` and left-movers :math:`s \in \mathbb{Z} -
+    \phi`.  Drawn in the plane it is an open curve whose two ends are related by
+    the rotation -- which is what a twisted string is, and why it cannot leave
+    the fixed point.
+
+    ``phase`` is :math:`\phi = k/N`; ``amplitudes`` are the coefficients of the
+    lowest right- and left-moving modes.  The dashed line joins the two ends
+    through the fixed point, so the angle between them is the twist.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
+
+    if not 0.0 < phase < 1.0:
+        raise ValueError(f"phase must lie strictly in (0, 1), got {phase}")
+    right, left = (float(value) for value in amplitudes)
+    centre = np.asarray(fixed_point, dtype=float).reshape(2)
+
+    sigma = np.linspace(0.0, 2.0 * np.pi, n_sigma)
+    tau = np.linspace(0.0, 2.0 * np.pi / phase, n_frames, endpoint=False)
+
+    def profile(time: float) -> np.ndarray:
+        z = right * np.exp(-1j * phase * (time - sigma)) + left * np.exp(
+            -1j * (1.0 - phase) * (time + sigma)
+        )
+        return np.stack([centre[0] + z.real, centre[1] + z.imag], axis=-1)
+
+    frames = np.array([profile(t) for t in tau])
+    span = 1.25 * float(np.max(np.abs(frames - centre)))
+
+    fig, ax = plt.subplots(figsize=(5.2, 5.2), dpi=110)
+    (curve,) = ax.plot([], [], lw=2.4, color="tab:blue")
+    (ends,) = ax.plot([], [], "o", ms=7, color="tab:red")
+    (chord,) = ax.plot([], [], "--", lw=1.0, color="0.55")
+    ax.plot(centre[0], centre[1], "x", ms=10, mew=2.0, color="k")
+    ax.text(centre[0], centre[1] - 0.14 * span, "fixed point", ha="center", fontsize=9)
+    ax.set_xlim(centre[0] - span, centre[0] + span)
+    ax.set_ylim(centre[1] - span, centre[1] + span)
+    ax.set_aspect("equal", adjustable="box")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_title(
+        title or rf"Twisted string: the ends differ by a rotation of $2\pi\cdot{phase:.3g}$",
+        fontsize=10,
+    )
+
+    def update(index: int):
+        points = frames[index]
+        curve.set_data(points[:, 0], points[:, 1])
+        ends.set_data(points[[0, -1], 0], points[[0, -1], 1])
+        chord.set_data(
+            [points[0, 0], centre[0], points[-1, 0]], [points[0, 1], centre[1], points[-1, 1]]
+        )
+        return curve, ends, chord
+
+    anim = FuncAnimation(fig, update, frames=len(frames), blit=False)
+    return _save_animation(anim, fig, path, fps)
+
+
+def animate_bion_spike(
+    profiles,
+    path,
+    n_grid: int = 90,
+    extent: float = 1.0,
+    hold: int = 8,
+    fps: int = 12,
+    height: float | None = None,
+    title: str | None = None,
+) -> Path:
+    r"""A D-brane stretching into a spike as fundamental strings are attached.
+
+    ``profiles`` is a sequence of ``(label, radial_function)``: each is called
+    with an array of radii and returns the transverse position ``X(r)``.  What
+    is drawn is a two-dimensional slice of the brane through the string's
+    endpoint, so the spike *is* the string -- the same object seen from the
+    brane's side rather than from the string's.
+
+    Every frame is a genuine BPS solution rather than an interpolation: the
+    flux is quantised, so the family is discrete, and each held frame solves the
+    equations exactly.  All are clipped at the same ``height``, because all of
+    them are infinitely tall; what grows with the number of strings is the width
+    of the funnel.  The camera turns while it grows.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
+
+    entries = list(profiles)
+    if not entries:
+        raise ValueError("give at least one (label, profile) pair")
+
+    axis = np.linspace(-extent, extent, n_grid)
+    grid_x, grid_y = np.meshgrid(axis, axis)
+    radius = np.hypot(grid_x, grid_y)
+    inner = extent / n_grid
+    surfaces = [np.asarray(fn(np.maximum(radius, inner)), dtype=float) for _, fn in entries]
+    ceiling = (
+        float(height)
+        if height is not None
+        else min(float(np.asarray(fn(np.array([extent / 6.0])))[0]) for _, fn in entries)
+    )
+
+    fig = plt.figure(figsize=(5.6, 5.0), dpi=110)
+    ax = fig.add_subplot(111, projection="3d")
+    frames = len(entries) * hold
+
+    def update(index: int):
+        which = index // hold
+        ax.clear()
+        ax.plot_surface(
+            grid_x,
+            grid_y,
+            np.minimum(surfaces[which], ceiling),
+            cmap="viridis",
+            linewidth=0,
+            antialiased=True,
+            rstride=1,
+            cstride=1,
+        )
+        ax.set_zlim(0.0, ceiling)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_zlabel("transverse $X$")
+        ax.view_init(elev=26.0, azim=-60.0 + 360.0 * index / max(frames - 1, 1))
+        ax.set_title(f"{title or 'BIon spike'}\n{entries[which][0]}", fontsize=10)
+        return ()
+
+    anim = FuncAnimation(fig, update, frames=frames, blit=False)
+    return _save_animation(anim, fig, path, fps)
