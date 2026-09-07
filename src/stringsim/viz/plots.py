@@ -38,6 +38,8 @@ __all__ = [
     "plot_channel_duality",
     "plot_fuzzy_sphere",
     "plot_myers_landscape",
+    "plot_hodge_diamond",
+    "plot_fixed_loci",
 ]
 
 FUNDAMENTAL_DOMAIN_FLOOR = math.sqrt(3.0) / 2.0
@@ -919,4 +921,87 @@ def plot_myers_landscape(configurations, path, title: str | None = None) -> Path
     ax.plot([], [], "s", color="tab:orange", label="a single fuzzy sphere")
     ax.plot([], [], "s", color="tab:blue", label="split into blocks")
     ax.legend(loc="lower right", fontsize=9)
+    return _save(fig, path)
+
+
+def plot_hodge_diamond(entries, path, title: str | None = None) -> Path:
+    r"""Hodge diamonds side by side, one per panel.
+
+    ``entries`` is a sequence of ``(label, diamond)`` where ``diamond`` maps
+    ``(p, q)`` to an integer, as
+    :func:`stringsim.compactification.hodge.untwisted_hodge` returns and
+    :func:`stringsim.compactification.hodge.hodge_numbers` completes.
+
+    The diamond is drawn the usual way, ``h^{p,q}`` at the point
+    ``(q - p, -(p + q))``, so the two numbers that are not forced by symmetry
+    sit in the middle row.  Discrete torsion exchanges them: the same geometry,
+    the same Euler characteristic up to a sign, and a mirror.
+    """
+    entries = list(entries)
+    if not entries:
+        raise ValueError("give at least one (label, diamond) pair")
+    fig, axes = _fig(1, len(entries), figsize=(3.7 * len(entries) + 0.6, 4.3))
+    axes = np.atleast_1d(axes)
+    for ax, (label, diamond) in zip(axes, entries, strict=True):
+        middle = {(1, 1), (2, 2), (1, 2), (2, 1)}
+        for (p, q), value in diamond.items():
+            x, y = q - p, -(p + q)
+            highlight = (p, q) in middle
+            ax.text(
+                x,
+                y,
+                f"{value}",
+                ha="center",
+                va="center",
+                fontsize=13 if highlight else 11,
+                color="tab:blue" if highlight else "0.35",
+                fontweight="bold" if highlight else "normal",
+            )
+        ax.set_xlim(-3.4, 3.4)
+        ax.set_ylim(-6.7, 0.7)
+        ax.set_aspect("equal", adjustable="box")
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.grid(False)
+        ax.set_frame_on(False)
+        ax.set_title(label, fontsize=10)
+    fig.suptitle(title or "The Hodge diamond, and what a phase does to it", fontsize=11)
+    return _save(fig, path)
+
+
+def plot_fixed_loci(entries, path, title: str | None = None) -> Path:
+    """What each group element holds still, and how much of it there is.
+
+    ``entries`` is a sequence of ``(label, [(element, components, dimension)])``.
+    Bars are the number of components; the colour says whether the pieces are
+    points or positive-dimensional, which is the whole difference between a
+    contribution to the Euler characteristic and a zero.
+    """
+    entries = list(entries)
+    if not entries:
+        raise ValueError("give at least one orbifold")
+    labels, counts, colours, dividers = [], [], [], []
+    position = 0
+    for name, rows in entries:
+        for element, components, dimension in rows:
+            labels.append(f"{name}\n{element}")
+            counts.append(components)
+            colours.append("tab:orange" if dimension == 0 else "tab:blue")
+            position += 1
+        dividers.append(position - 0.5)
+
+    fig, ax = _fig(figsize=(max(6.4, 0.9 * len(counts) + 2.0), 4.2))
+    ax.bar(np.arange(len(counts)), counts, color=colours)
+    for index, value in enumerate(counts):
+        ax.text(index, value + 0.6, str(value), ha="center", fontsize=9)
+    for line in dividers[:-1]:
+        ax.axvline(line, color="0.7", lw=0.9, ls="--")
+    ax.set_xticks(np.arange(len(counts)))
+    ax.set_xticklabels(labels, fontsize=7)
+    ax.set_ylabel("components of the fixed set")
+    ax.set_ylim(0, max(counts) * 1.2)
+    ax.plot([], [], "s", color="tab:orange", label="isolated points (counts towards $\\chi$)")
+    ax.plot([], [], "s", color="tab:blue", label="curves ($\\chi = 0$)")
+    ax.legend(loc="upper right", fontsize=9)
+    ax.set_title(title or "What each element of the group holds still")
     return _save(fig, path)

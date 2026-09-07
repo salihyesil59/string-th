@@ -25,7 +25,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 780 checks
+python -m pytest                          # 823 checks
 ```
 
 ---
@@ -416,6 +416,66 @@ g1-twisted   no torsion  1  0  3  0  12  0  35  0   97  0  247
 These are oscillator counts. The fixed-point multiplicities and the phases the
 group acts with on them are not included, so this is the mechanism behind
 `(h11, h21) = (51, 3) <-> (3, 51)` rather than that number itself.
+
+
+**And the Hodge numbers, which is where discrete torsion shows its hand** —
+`stringsim.compactification.hodge`. Above, the phases were derived and the
+classic consequence was left uncomputed. Here it is computed, out of two things
+that have nothing to do with each other.
+
+**The Euler characteristic is a count of lattice points.**
+
+```
+chi = (1/|G|) sum_{gh=hg} eps(g,h) chi(M^(g,h))
+```
+
+`M^(g,h)` is what both elements hold still. On a torus that is a union of
+subtori, so its Euler characteristic is zero unless the pieces are points — and
+then it is how many. Both facts come from one integer computation: stack `1-g`
+above `1-h` and read the Smith invariants, whose product is the `gcd` of the
+maximal minors. For `T^6/(Z_2 x Z_2)` **no single element has an isolated fixed
+point** — each fixes 16 curves — and the points appear only when two *different*
+elements are asked at once:
+
+```
+     g        h   chi(M^(g,h))
+(0, 1)   (1, 0)             64      ... six such pairs, and nothing else
+```
+
+so `chi = 6 x 64 / 4 = 96`. The non-trivial pairing is `-1` on exactly those six
+pairs, so with torsion `chi = -96`.
+
+**The untwisted forms are a character average.** The trace of `g` on
+`Lambda^p (x) conj(Lambda^q)` is `e_p(lambda) conj(e_q(lambda))`, so
+`h^{p,q}` is that averaged over the group. `h^{3,0} = 1` comes out, which is the
+Calabi-Yau condition `prod lambda_j = 1` — checked in the constructor, which
+refuses an action in `U(3)` rather than producing a diamond that is not one.
+
+**One geometric input, stated:** each singular locus carries one blow-up modulus
+(an `A_1` curve has one exceptional divisor), and loci are counted once per pair
+`{g, g^-1}`, since an element and its inverse hold the same set still. Then
+
+```
+h11 - h21 = chi/2                        (a gcd of integer minors)
+h11 + h21 = untwisted + blow-up moduli   (a sum of roots of unity)
+```
+
+| orbifold | untwisted | blow-ups | `chi` | `(h11, h21)` |
+|---|---|---|---|---|
+| `T^6/Z_3` | `(9, 0)` | 27 | `+72` | **(36, 0)** |
+| `T^6/Z_4` | `(5, 1)` | 32 | `+48` | **(31, 7)** |
+| `T^6/(Z_2 x Z_2)` | `(3, 3)` | 48 | `+96` | **(51, 3)** |
+| ... with discrete torsion | `(3, 3)` | 48 | `-96` | **(3, 51)** |
+
+The two sides never met. That they always give non-negative integers, and the
+right ones for three standard orbifolds, is the check — and a wrong blow-up
+count would show up as a parity failure rather than a plausible answer.
+
+The last two rows are the payoff. Same untwisted forms, same 48 twisted moduli,
+same `h11 + h21 = 54`. Only the sign of `chi` moves, and it decides which side
+the 48 land on. **Two Calabi-Yau manifolds with their Hodge numbers exchanged is
+a mirror pair, and a phase with one bit of freedom in it produced one.**
+`figures/hodge_diamond.png` puts the two diamonds side by side.
 
 ### 6. The superstring: worldsheet fermions and GSO — `stringsim.superstring`
 
@@ -997,6 +1057,8 @@ needed. `examples/` produces:
 | `channel_duality.png` | an open loop and a closed exchange, on top of each other |
 | `fuzzy_sphere.png`, `fuzzy_sphere.gif` | N D0-branes assembling into a sphere |
 | `myers_landscape.png` | every way of splitting N branes, and what each costs |
+| `hodge_diamond.png` | the same orbifold with and without a phase, mirrored |
+| `fixed_loci.png` | what each group element holds still, and whether it counts |
 | `fermion_reflection.png` | a pulse bouncing: NS colours alternate, R do not |
 | `fermion_reflection.gif` | the same pulse, moving -- and coming back upside down in NS |
 | `brane_separation.png` | levels rising as branes separate |
@@ -1023,6 +1085,7 @@ python examples/13_asymmetric_and_torsion.py   # non-geometric twists, epsilon(g
 python examples/14_dbi_and_m_theory.py         # DBI, the BIon spike, M2/M5
 python examples/15_one_loop.py                # modular invariance, no ultraviolet
 python examples/16_myers_effect.py            # matrices, the fuzzy sphere, 1 - 1/N^2
+python examples/17_hodge_numbers.py           # (51, 3) <-> (3, 51), from fixed points
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -1035,7 +1098,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-780 checks, about 85 seconds. They are cross-checks rather than regression
+823 checks, about 95 seconds. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
@@ -1087,11 +1150,12 @@ wrong, not merely if the code changed. A representative sample:
   commutator terms only -- the full non-abelian DBI is not unambiguously
   defined -- and the Chern-Simons normalisation is folded into the flux
   parameter rather than derived.
-* **Twisted spectra of asymmetric orbifolds, and Hodge numbers.** The candidate
-  twists are enumerated and the consistency conditions applied to them, and the
-  discrete-torsion phases are derived — but the states themselves are not built,
-  shifts are not implemented, and the fixed-point data a Hodge number needs is
-  absent. Curved compactifications are out of scope entirely.
+* **Twisted spectra of asymmetric orbifolds.** The candidate twists are
+  enumerated and the consistency conditions applied to them, but the states
+  themselves are not built and shifts are not implemented. Hodge numbers are
+  computed for abelian orbifolds of `T^6` with the one-modulus-per-locus rule;
+  non-abelian groups, overlapping loci and the resolution itself are not, and
+  curved compactifications are out of scope entirely.
 * **Higher genus, and amplitudes with insertions.** The one-loop vacuum diagram
   and its moduli space are computed; two loops, vertex operators on the torus,
   and the annulus with different branes at the two ends are not.
