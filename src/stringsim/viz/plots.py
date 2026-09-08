@@ -51,6 +51,8 @@ __all__ = [
     "plot_anomaly_scan",
     "plot_orientifold_spectrum",
     "plot_worldsheet_surfaces",
+    "plot_modular_invariance",
+    "plot_narain_levels",
 ]
 
 FUNDAMENTAL_DOMAIN_FLOOR = math.sqrt(3.0) / 2.0
@@ -1556,4 +1558,117 @@ def plot_worldsheet_surfaces(panels, path, title: str = "The four one-loop world
         fontsize=9,
         color="0.35",
     )
+    return _save(fig, path)
+
+
+def plot_modular_invariance(rows, weights, path, title: str = "What modular invariance needs"):
+    r"""The two conditions on the lattice, failing separately.
+
+    ``rows`` is a sequence of ``(label, T residual, S residual, truncation)``,
+    one per lattice tried.  ``weights`` is a sequence of
+    ``(|tau|, |Theta(-1/tau)| / |Theta(tau)|, |tau|^d)`` sampled along a path.
+
+    Left: ``T`` invariance needs only that the lattice is even, so it survives
+    every sublattice; ``S`` needs self-duality and does not.  The dashed line is
+    the truncation of the lattice sum -- anything at that level is arithmetic,
+    anything far above it is the lattice.
+
+    Right: the theta series is *not* invariant on its own.  It carries weight,
+    picking up exactly ``|tau|^d``, and the invariance of the full integrand is
+    that factor cancelling against ``|eta|^{2d}``.
+    """
+    rows = [(str(name), float(t), float(s), float(gap)) for name, t, s, gap in rows]
+    weights = [(float(a), float(b), float(c)) for a, b, c in weights]
+
+    fig, (left, right) = _fig(1, 2, figsize=(10.8, 4.5))
+
+    labels = [name for name, _, _, _ in rows]
+    positions = np.arange(len(labels))
+    floor = 1e-17
+    t_values = np.maximum([t for _, t, _, _ in rows], floor)
+    s_values = np.maximum([s for _, _, s, _ in rows], floor)
+    width = 0.38
+    left.bar(positions - width / 2, t_values, width, color="#1f77b4", label="$T$: $\\tau + 1$")
+    left.bar(positions + width / 2, s_values, width, color="#d62728", label="$S$: $-1/\\tau$")
+    gap = max(g for _, _, _, g in rows)
+    left.axhline(max(gap, floor), color="0.35", lw=1.0, ls="--")
+    left.annotate(
+        "truncation of the lattice sum",
+        xy=(-0.5, max(gap, floor)),
+        xytext=(4, -12),
+        textcoords="offset points",
+        ha="left",
+        fontsize=8,
+        color="0.35",
+    )
+    left.set_yscale("log")
+    left.set_xticks(positions)
+    left.set_xticklabels(labels, rotation=15, ha="right", fontsize=9)
+    left.set_ylabel("relative change in the integrand")
+    left.set_title("even is not enough")
+    left.legend(frameon=False, fontsize=9)
+
+    xs = [a for a, _, _ in weights]
+    right.plot(xs, [b for _, b, _ in weights], "o", ms=6, mfc="none",
+               color="#1f77b4", label=r"$|\Theta(-1/\tau)| / |\Theta(\tau)|$")
+    right.plot(xs, [c for _, _, c in weights], "-", lw=1.4, color="#2ca02c",
+               label=r"$|\tau|^{d}$")
+    right.set_xlabel(r"$|\tau|$")
+    right.set_ylabel("ratio")
+    right.set_title("the theta series carries weight")
+    right.legend(frameon=False, fontsize=9)
+
+    fig.suptitle(title, y=1.0)
+    return _save(fig, path)
+
+
+def plot_narain_levels(panels, path, title: str = "Where the charges sit"):
+    r"""The lattice's levels in the :math:`(\ell_L^2/2,\ \ell_R^2/2)` plane.
+
+    ``panels`` is a sequence of ``(label, levels)`` where ``levels`` maps
+    ``(h, h_bar)`` to a multiplicity.  Marker area is the multiplicity; the two
+    axes carry the roots, so a point on an axis at 1 is a gauge boson.
+
+    Each charge moves along a line of fixed ``h - h_bar = n.w`` as the moduli
+    change, since that combination does not depend on them.  Sitting exactly on
+    an axis is what a special point in moduli space *is*.
+    """
+    panels = list(panels)
+    fig, axes = _fig(1, len(panels), figsize=(4.4 * len(panels), 4.3))
+    axes = np.atleast_1d(axes)
+    reach = max(
+        (max(max(k) for k in levels) if levels else 1.0) for _, levels in panels
+    )
+    reach = min(float(reach), 4.0)
+
+    for ax, (label, levels) in zip(axes, panels, strict=True):
+        xs, ys, sizes = [], [], []
+        roots, root_states = [], 0
+        for (h, h_bar), count in levels.items():
+            if h > reach + 1e-9 or h_bar > reach + 1e-9:
+                continue
+            xs.append(h)
+            ys.append(h_bar)
+            sizes.append(18 + 26 * (count - 1))
+            if (abs(h - 1) < 1e-9 and h_bar < 1e-9) or (abs(h_bar - 1) < 1e-9 and h < 1e-9):
+                roots.append((h, h_bar))
+                # A root *level* can hold several charges -- (n, w) and its
+                # negative at least -- and it is the states that are gauge
+                # bosons, so the title counts multiplicities and not points.
+                root_states += count
+        ax.axhline(0.0, color="0.75", lw=1.0)
+        ax.axvline(0.0, color="0.75", lw=1.0)
+        ax.plot([0, reach], [0, reach], color="0.85", lw=1.0, ls="--")
+        ax.scatter(xs, ys, s=sizes, color="#1f77b4", alpha=0.75, zorder=3)
+        if roots:
+            ax.scatter([x for x, _ in roots], [y for _, y in roots], s=90,
+                       facecolors="none", edgecolors="#d62728", lw=1.6, zorder=4)
+        ax.set_xlim(-0.25, reach + 0.25)
+        ax.set_ylim(-0.25, reach + 0.25)
+        ax.set_aspect("equal")
+        ax.set_xlabel(r"$\ell_L^2 / 2$")
+        ax.set_ylabel(r"$\ell_R^2 / 2$")
+        ax.set_title(f"{label} -- {root_states} roots", fontsize=11)
+
+    fig.suptitle(title, y=1.0)
     return _save(fig, path)
