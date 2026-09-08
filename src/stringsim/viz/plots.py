@@ -58,6 +58,8 @@ __all__ = [
     "plot_boundary_state",
     "plot_black_hole_entropy",
     "plot_pq_strings",
+    "plot_mirror_hodge",
+    "plot_reflexive_duality",
 ]
 
 FUNDAMENTAL_DOMAIN_FLOOR = math.sqrt(3.0) / 2.0
@@ -1951,6 +1953,94 @@ def plot_pq_strings(curves, junctions, path, title: str = "The $SL(2,Z)$ multipl
 
     for ax, (label, charges, tau) in zip(axes[1:], panels, strict=True):
         _draw_junction(ax, charges, tau, label)
+
+    fig.suptitle(title, y=1.0)
+    return _save(fig, path)
+
+
+def plot_mirror_hodge(points, highlights, path, title: str = "Mirror symmetry, as a reflection"):
+    r"""The Hodge plot: every family and its mirror, reflected in the axis.
+
+    ``points`` is a sequence of ``(h11, h21)``; ``highlights`` a sequence of
+    ``(label, h11, h21)`` to name.  Each entry is drawn twice, once as itself
+    and once with the two numbers swapped, because the dual polytope is a
+    Calabi-Yau too.
+
+    The horizontal axis is :math:`\chi = 2(h^{1,1} - h^{2,1})` and the vertical
+    is :math:`h^{1,1} + h^{2,1}`.  The picture is symmetric about
+    :math:`\chi = 0` -- not because it was made so, but because the two Hodge
+    numbers are the same function of a polytope and of its dual.
+    """
+    points = [(int(a), int(b)) for a, b in points]
+    fig, ax = _fig(figsize=(7.6, 5.2))
+
+    forward = np.array([[2 * (a - b), a + b] for a, b in points], dtype=float)
+    mirrored = np.array([[2 * (b - a), a + b] for a, b in points], dtype=float)
+    ax.scatter(forward[:, 0], forward[:, 1], s=26, color="#1f77b4", alpha=0.8,
+               label="from $\\Delta^*$")
+    ax.scatter(mirrored[:, 0], mirrored[:, 1], s=26, facecolors="none",
+               edgecolors="#d62728", linewidths=1.1, label="from $\\Delta$")
+    ax.axvline(0.0, color="0.5", lw=1.0, ls=":")
+
+    for label, a, b in highlights:
+        for x, y, colour in (
+            (2 * (a - b), a + b, "#1f77b4"),
+            (2 * (b - a), a + b, "#d62728"),
+        ):
+            ax.annotate(
+                str(label), xy=(x, y), xytext=(0, 9), textcoords="offset points",
+                ha="center", fontsize=8, color=colour,
+            )
+    ax.set_xlabel(r"$\chi = 2(h^{1,1} - h^{2,1})$")
+    ax.set_ylabel(r"$h^{1,1} + h^{2,1}$")
+    ax.set_title(title)
+    ax.legend(frameon=False, fontsize=9)
+    return _save(fig, path)
+
+
+def plot_reflexive_duality(panels, path, title: str = "A polytope and its dual"):
+    r"""Two-dimensional reflexive polygons drawn beside their duals.
+
+    ``panels`` is a sequence of ``(label, vertices, lattice points, dual
+    vertices, dual lattice points)``, all integer arrays.
+
+    Reflexive means the dual is a lattice polygon too, and that is the whole
+    content of the picture: both sides have their vertices on lattice points and
+    exactly one lattice point -- the origin -- in the interior.  In four
+    dimensions the same condition is what makes a Calabi-Yau, and the pairing of
+    the two polytopes is the mirror.
+    """
+    panels = list(panels)
+    fig, axes = _fig(2, len(panels), figsize=(3.5 * len(panels), 6.8))
+    axes = np.atleast_2d(axes)
+    if axes.shape[0] == 1:  # pragma: no cover - single row would be a bug
+        axes = axes.T
+
+    for column, (label, verts, pts, dual_verts, dual_pts) in enumerate(panels):
+        for row, (vertices, points, colour, name) in enumerate(
+            ((verts, pts, "#1f77b4", label), (dual_verts, dual_pts, "#d62728", "its dual"))
+        ):
+            ax = axes[row, column]
+            vertices = np.asarray(vertices, dtype=float)
+            points = np.asarray(points, dtype=float)
+            order = np.argsort(np.arctan2(vertices[:, 1], vertices[:, 0]))
+            loop = np.vstack([vertices[order], vertices[order][:1]])
+            ax.fill(loop[:, 0], loop[:, 1], color=colour, alpha=0.12, zorder=1)
+            ax.plot(loop[:, 0], loop[:, 1], "-", lw=1.6, color=colour, zorder=2)
+            reach = max(3.0, float(np.abs(vertices).max()) + 1.0)
+            grid = np.arange(-int(reach), int(reach) + 1)
+            mesh = np.array([[x, y] for x in grid for y in grid], dtype=float)
+            ax.plot(mesh[:, 0], mesh[:, 1], ".", ms=1.6, color="0.8", zorder=0)
+            ax.plot(points[:, 0], points[:, 1], "o", ms=4, color=colour, zorder=3)
+            ax.plot([0], [0], "o", ms=7, mfc="none", mec="black", mew=1.3, zorder=4)
+            ax.set_xlim(-reach - 0.4, reach + 0.4)
+            ax.set_ylim(-reach - 0.4, reach + 0.4)
+            ax.set_aspect("equal")
+            ax.set_xticks([])
+            ax.set_yticks([])
+            for spine in ax.spines.values():
+                spine.set_visible(False)
+            ax.set_title(f"{name}   ({len(points)} points)", fontsize=10)
 
     fig.suptitle(title, y=1.0)
     return _save(fig, path)
