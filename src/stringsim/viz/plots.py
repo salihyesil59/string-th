@@ -57,6 +57,7 @@ __all__ = [
     "plot_five_point_moduli",
     "plot_boundary_state",
     "plot_black_hole_entropy",
+    "plot_pq_strings",
 ]
 
 FUNDAMENTAL_DOMAIN_FLOOR = math.sqrt(3.0) / 2.0
@@ -1861,6 +1862,95 @@ def plot_black_hole_entropy(curves, scans, path, title: str = "An entropy, count
     right.set_ylabel("entropy, relative to the first")
     right.set_title("the horizon forgets the moduli")
     right.legend(frameon=False, fontsize=9)
+
+    fig.suptitle(title, y=1.0)
+    return _save(fig, path)
+
+
+def _draw_junction(ax, charges, tau, title, show_polygon=True):
+    """Rays leaving a point, and the force vectors laid tip to tail."""
+    vectors = [complex(p) + complex(q) * tau for p, q in charges]
+    scale = max(abs(v) for v in vectors)
+    colours = ["#1f77b4", "#2ca02c", "#ff7f0e", "#9467bd", "#8c564b"]
+
+    for (p, q), vector, colour in zip(charges, vectors, colours, strict=False):
+        direction = vector / abs(vector)
+        end = direction * 1.0
+        ax.annotate(
+            "",
+            xy=(end.real, end.imag),
+            xytext=(0.0, 0.0),
+            arrowprops={
+                "arrowstyle": "-|>",
+                "color": colour,
+                "lw": 1.0 + 3.0 * abs(vector) / scale,
+                "shrinkA": 0,
+                "shrinkB": 0,
+            },
+            zorder=3,
+        )
+        label = direction * 1.16
+        ax.text(label.real, label.imag, f"$({p},{q})$", ha="center", va="center",
+                fontsize=9, color=colour)
+
+    if show_polygon:
+        walk = [0j]
+        for vector in vectors:
+            walk.append(walk[-1] + vector / scale * 0.55)
+        path = np.array([[z.real, z.imag] for z in walk]) + np.array([0.0, -1.75])
+        ax.plot(path[:, 0], path[:, 1], "-o", ms=3, lw=1.2, color="0.45", zorder=2)
+        ax.text(path[0, 0], path[0, 1] - 0.28, "force vectors, tip to tail",
+                ha="center", fontsize=8, color="0.4")
+
+    ax.plot([0], [0], "o", ms=6, color="black", zorder=4)
+    ax.set_xlim(-1.5, 1.5)
+    ax.set_ylim(-2.6, 1.5)
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.set_title(title, fontsize=10)
+
+
+def plot_pq_strings(curves, junctions, path, title: str = "The $SL(2,Z)$ multiplet"):
+    r"""The tension lattice against the coupling, and a junction it holds together.
+
+    ``curves`` is a sequence of ``(label, couplings, tensions)``; ``junctions``
+    a sequence of ``(label, charges, tau)``.
+
+    Left: :math:`T_{p,q} = |p + q\tau| / 2\pi\alpha'`.  The fundamental string
+    is flat, the D1 falls like :math:`1/g_s`, and they cross at :math:`g_s = 1`
+    -- which is the fixed point of ``S`` and the reason the two are the same
+    kind of object.
+
+    Right: a junction.  Each string leaves along the phase of :math:`p + q\tau`
+    with a thickness set by its tension, and the same vectors laid tip to tail
+    close into a polygon.  They close because the charges add to zero; the
+    angles were never chosen.
+    """
+    panels = list(junctions)
+    fig, axes = _fig(1, 1 + len(panels), figsize=(4.6 + 3.4 * len(panels), 4.4))
+    axes = np.atleast_1d(axes)
+    spectrum = axes[0]
+
+    for label, couplings, values in curves:
+        spectrum.loglog(
+            np.asarray(couplings, dtype=float), np.asarray(values, dtype=float),
+            lw=1.7, label=str(label),
+        )
+    spectrum.axvline(1.0, color="0.5", lw=1.0, ls=":")
+    spectrum.annotate(
+        "$g_s = 1$", xy=(1.0, spectrum.get_ylim()[0]), xytext=(4, 6),
+        textcoords="offset points", fontsize=9, color="0.4",
+    )
+    spectrum.set_xlabel("string coupling $g_s$")
+    spectrum.set_ylabel(r"$T_{p,q}$")
+    spectrum.set_title("one lattice of strings", fontsize=11)
+    spectrum.legend(frameon=False, fontsize=9)
+
+    for ax, (label, charges, tau) in zip(axes[1:], panels, strict=True):
+        _draw_junction(ax, charges, tau, label)
 
     fig.suptitle(title, y=1.0)
     return _save(fig, path)
