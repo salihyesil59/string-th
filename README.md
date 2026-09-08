@@ -25,7 +25,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 1180 checks
+python -m pytest                          # 1202 checks
 ```
 
 ---
@@ -1164,6 +1164,87 @@ being told. Finally `2 kappa_11^2 T_M2 T_M5 = 2 pi` to `1e-16`: the membrane and
 the fivebrane are electric and magnetic sources of the same three-form, so their
 tensions were never independent.
 
+**A black hole's entropy, counted and then measured** — `branes/entropy.py`.
+The D1-D5-P system — `Q_1` D1-branes on a circle, `Q_5` D5-branes on
+`T^4 x S^1`, and `N` units of momentum along the circle — is a black hole in the
+five non-compact directions. Its entropy can be got at two ways that share no
+step.
+
+**Counting.** The bound state is a two-dimensional CFT with `4 Q_1 Q_5` bosons
+and as many fermions, so `c = 4 Q_1 Q_5 + (1/2) 4 Q_1 Q_5 = 6 Q_1 Q_5`. The
+momentum sits in the left-movers, and the number of ways of putting it there is
+the coefficient of `q^N` in
+
+```
+prod_n [(1 + q^n) / (1 - q^n)]^{4 Q_1 Q_5}
+```
+
+computed in exact integers — `d_60` for `Q_1 = Q_5 = 1` already has 24 digits,
+and the whole point is its logarithm. Switching the numerator off has to land on
+the oscillator degeneracies of section 2, and it does.
+
+**And the Cardy exponent is measured, not quoted.** At any level that can be
+reached `log d_N` is well below `2 pi sqrt(Q_1 Q_5 N)` — 0.78 of it at `N = 60`
+— so the comparison has to be a fit. Fitting `log d_N = a sqrt(N) + b log N + c`:
+
+| `Q_1` | `Q_5` | `n_max` | `a` | `2 pi sqrt(Q_1 Q_5)` | error |
+|---|---|---|---|---|---|
+| 1 | 1 | 400 | 6.280706 | 6.283185 | `3.9e-4` |
+| 1 | 2 | 400 | 8.880836 | 8.885766 | `5.5e-4` |
+| 2 | 2 | 300 | 12.551258 | 12.566371 | `1.2e-3` |
+
+The `log N` term is not optional: dropping it moves the answer from `3.9e-4` to
+`3.2e-2`, which is the same lesson `fit_hagedorn` learned in section 2. And `b`
+heads for `-(3 + 4 Q_1 Q_5)/4` slowly — `-1.690` at `n_max = 200`, `-1.729` at
+1600, against `-1.75`.
+
+**Measuring.** The same charges make an extremal black hole. Its horizon is a
+three-sphere of radius `(r_1 r_5 r_p)^{1/3}`, so `A = 2 pi^2 r_1 r_5 r_p`, and
+
+```
+A / 4 G_5  =  2 pi sqrt(Q_1 Q_5 N)
+```
+
+for every charge tried, to twelve digits.
+
+**What is derived on that side is the moduli-independence.** An entropy counts
+states, so it cannot depend on a continuous parameter. Varying the string
+coupling, the volume of the `T^4`, the radius of the circle and `alpha'` over
+more than an order of magnitude each:
+
+```
+  g_s     V      R    alpha'      A / 4 G_5
+ 0.30   2.00   1.50    1.00     407.1969473588
+ 0.05   6.90   0.60    2.30     407.1969473588
+ 0.90   0.40   5.50    0.70     407.1969473588
+ 0.31   3.30   1.10    1.90     407.1969473588
+```
+
+That needs the powers in the three harmonic radii and in `G_5` to be mutually
+consistent, and any one of them wrong breaks it — the test suite checks by
+putting an extra power of `g_s` back and watching the entropy move with it.
+
+**What the agreement fixes, said out loud.** The moduli cancel whatever
+convention is used for the `T^4` volume; what the convention changes is one
+overall number:
+
+| convention | `S_Cardy / S_BH` |
+|---|---|
+| `V` throughout | `16 pi^4` |
+| `v = V/(2pi)^4 alpha'^2` in `r_1` only | `4 pi^2` |
+| `v` in `r_1` and `r_p` | **1** |
+
+Only the last makes the two calculations agree, and that is how the convention
+is chosen here — the same way the type IIB anomaly picks the Hirzebruch class
+above. The match has seven parameters in it (three charges, four moduli) and one
+number to get right, and the ratio does not move across any of them, so it is
+evidence rather than a fit. The alternatives are kept in the module so the
+choice is visible rather than buried.
+
+`figures/black_hole_entropy.png` puts the count under the Cardy line and the
+horizon against its moduli, with one power of `g_s` left in as a control;
+`figures/cardy_fit.gif` watches `2 pi` get measured out of a list of integers.
+
 **A brane as a closed string** — `branes/boundary.py`. Above, a D-brane is
 described by what ends on it. It can also be described by what it *emits*: a
 coherent state of closed strings.
@@ -1848,6 +1929,8 @@ needed. `examples/` produces:
 | `fermion_reflection.gif` | the same pulse, moving -- and coming back upside down in NS |
 | `brane_separation.png` | levels rising as branes separate |
 | `veneziano.png` | the amplitude and its poles |
+| `black_hole_entropy.png` | the count under the Cardy line, and a horizon that forgets its moduli |
+| `cardy_fit.gif` | `2 pi` being measured out of a list of integers |
 | `boundary_state.png` | a coherent state's norm converging on the eta function |
 | `boundary_touch.gif` | the closed string that lies flat on the brane, and one that does not |
 | `koba_nielsen.png` | the integrand, the comparison, and the gauge dropping out |
@@ -1899,6 +1982,7 @@ python examples/23_type_i_orientifold.py      # type I: parity, D9-branes, SO(32
 python examples/24_narain_partition.py        # modular invariance, and what the lattice is for
 python examples/25_vertex_operators.py        # Veneziano from a worldsheet integral
 python examples/26_boundary_states.py         # a brane as a closed string it emits
+python examples/27_black_hole_entropy.py      # Strominger-Vafa, counted and measured
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -1911,7 +1995,8 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-1180 checks, a couple of minutes. They are cross-checks rather than regression
+1202 checks.  Two minutes on a quiet machine and six on a busy one -- the
+same suite has been timed at both, so the number is not quoted. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
@@ -1998,7 +2083,15 @@ wrong, not merely if the code changed. A representative sample:
   implementation to `2e-15`;
 * a closed string whose modes are glued lies flat on the brane at `tau = 0`,
   with `|Xdot|` along it and `|X - y|` across it both at round-off, while one
-  built from the same right-movers without the gluing never touches.
+  built from the same right-movers without the gluing never touches;
+* the Cardy exponent fitted out of the D1-D5-P degeneracies is
+  `2 pi sqrt(Q_1 Q_5)` to a part in a thousand, and drops to two per cent if the
+  subleading `log N` is left out of the fit;
+* the Bekenstein-Hawking entropy of the same charges is unchanged by the string
+  coupling, the compactification volume, the circle radius and `alpha'`, and
+  moves with any of them if one power is put back by hand;
+* the two entropies agree to twelve digits for every charge and every set of
+  moduli, with the ratio a single number rather than a function of anything.
 
 ---
 

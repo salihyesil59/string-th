@@ -42,6 +42,7 @@ __all__ = [
     "animate_narain_levels",
     "animate_pole_emergence",
     "animate_boundary_state",
+    "animate_cardy_fit",
 ]
 
 
@@ -1123,4 +1124,69 @@ def animate_boundary_state(panels, brane, path, fps: int = 20):
         return curves
 
     anim = FuncAnimation(fig, draw, frames=n_frames, blit=False)
+    return _save_animation(anim, fig, path, fps)
+
+
+def animate_cardy_fit(frames, target, path, fps: int = 6):
+    r"""Watch a famous number get measured out of a list of integers.
+
+    ``frames`` is a sequence of ``(n_max, sqrt(N), log d_N, fitted curve,
+    slope)``; ``target`` the value the slope should approach.
+
+    Left, the exact logarithms with the three-term fit laid over them.  Right,
+    the fitted coefficient of :math:`\sqrt N` against how many levels went into
+    the fit.  It climbs towards :math:`2\pi\sqrt{Q_1Q_5}` and does not get there
+    quickly: the subleading term is comparable to the leading one at every level
+    that can be reached, which is why the number has to be extracted rather than
+    read off.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
+
+    frames = [
+        (int(n), np.asarray(x, dtype=float), np.asarray(y, dtype=float),
+         np.asarray(f, dtype=float), float(s))
+        for n, x, y, f, s in frames
+    ]
+    target = float(target)
+    cutoffs = np.array([n for n, _, _, _, _ in frames], dtype=float)
+    slopes = np.array([s for _, _, _, _, s in frames])
+    top_x = max(float(x.max()) for _, x, _, _, _ in frames)
+    top_y = max(float(y.max()) for _, _, y, _, _ in frames)
+
+    fig, (left, right) = plt.subplots(1, 2, figsize=(9.8, 4.2), dpi=130)
+    fig.subplots_adjust(left=0.09, right=0.97, top=0.87, bottom=0.14, wspace=0.3)
+
+    (points,) = left.plot([], [], "o", ms=3, color="#1f77b4", alpha=0.7)
+    (model,) = left.plot([], [], "-", lw=1.8, color="#d62728")
+    left.set_xlim(0.0, top_x * 1.05)
+    left.set_ylim(0.0, top_y * 1.08)
+    left.set_xlabel(r"$\sqrt{N}$")
+    left.set_ylabel(r"$\log d_N$")
+    left.grid(alpha=0.25)
+
+    right.axhline(target, color="0.4", lw=1.0, ls="--")
+    right.annotate(
+        rf"$2\pi\sqrt{{Q_1Q_5}} = {target:.4f}$",
+        xy=(cutoffs[0], target), xytext=(6, -14), textcoords="offset points",
+        fontsize=9, color="0.35",
+    )
+    right.plot(cutoffs, slopes, "-", lw=1.4, color="#2ca02c")
+    (head,) = right.plot([], [], "o", ms=9, color="#d62728")
+    right.set_xscale("log")
+    right.set_xlabel("levels used")
+    right.set_ylabel(r"fitted coefficient of $\sqrt{N}$")
+    right.set_ylim(min(slopes.min(), target) - 0.02, max(slopes.max(), target) + 0.02)
+    right.grid(alpha=0.25)
+
+    def draw(i: int):
+        n_max, xs, ys, fitted, slope = frames[i]
+        points.set_data(xs, ys)
+        model.set_data(xs, fitted)
+        head.set_data([cutoffs[i]], [slope])
+        left.set_title(f"levels up to {n_max}", fontsize=11)
+        right.set_title(f"slope {slope:.5f}   ({abs(slope / target - 1):.1e} off)", fontsize=11)
+        return points, model, head
+
+    anim = FuncAnimation(fig, draw, frames=len(frames), blit=False)
     return _save_animation(anim, fig, path, fps)
