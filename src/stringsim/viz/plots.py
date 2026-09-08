@@ -47,6 +47,8 @@ __all__ = [
     "plot_central_charge",
     "plot_ghost_onset",
     "plot_no_ghost_region",
+    "plot_anomaly_conditions",
+    "plot_anomaly_scan",
 ]
 
 FUNDAMENTAL_DOMAIN_FLOOR = math.sqrt(3.0) / 2.0
@@ -1326,4 +1328,102 @@ def plot_no_ghost_region(
     ax.set_title(title)
     ax.grid(False)
     fig.colorbar(mesh, ax=ax, label="smallest physical norm (normalised)")
+    return _save(fig, path)
+
+
+def plot_anomaly_conditions(gravity, gauge, path, title: str = "What ten dimensions demand"):
+    r"""The two conditions Green-Schwarz cancellation imposes, side by side.
+
+    ``gravity`` is a sequence of ``(dim G, coefficient of tr R^6)`` and
+    ``gauge`` a sequence of ``(N, coefficient of tr F^6, dim SO(N))``.  Both
+    cross zero, and the crossings are not the same statement: the first fixes
+    only how many gauge bosons there are, the second fixes which group they
+    belong to.
+
+    They meet because ``dim SO(32) = 496``, which is marked on the right-hand
+    axis rather than asserted in the caption.
+    """
+    gravity = [(float(n), float(c)) for n, c in gravity]
+    gauge = [(float(n), float(c), int(d)) for n, c, d in gauge]
+
+    fig, (left, right) = _fig(1, 2, figsize=(10.6, 4.4))
+
+    xs = [n for n, _ in gravity]
+    ys = [c for _, c in gravity]
+    left.axhline(0.0, color="0.3", lw=1.0)
+    left.plot(xs, ys, "o-", ms=4, color="#1f77b4")
+    left.axvline(496.0, color="#d62728", lw=1.0, ls=":")
+    left.annotate(
+        "496",
+        xy=(496.0, 0.0),
+        xytext=(6, 10),
+        textcoords="offset points",
+        fontsize=10,
+        color="#d62728",
+    )
+    left.set_xlabel(r"gauge group dimension $\dim G$")
+    left.set_ylabel(r"coefficient of ${\rm tr}\,R^6$")
+    left.set_title("pure gravity: fixes the dimension")
+
+    xs = [n for n, _, _ in gauge]
+    ys = [c for _, c, _ in gauge]
+    right.axhline(0.0, color="0.3", lw=1.0)
+    right.plot(xs, ys, "s-", ms=4, color="#2ca02c")
+    right.axvline(32.0, color="#d62728", lw=1.0, ls=":")
+    marked = [(n, c, d) for n, c, d in gauge if c == 0.0]
+    for n, c, d in marked:
+        right.plot([n], [c], "*", ms=15, color="#d62728")
+        right.annotate(
+            f"SO({int(n)}), dim {d}",
+            xy=(n, c),
+            xytext=(8, 10),
+            textcoords="offset points",
+            fontsize=10,
+            color="#d62728",
+        )
+    right.set_xlabel(r"$N$ in $SO(N)$")
+    right.set_ylabel(r"coefficient of ${\rm tr}\,F^6$")
+    right.set_title("pure gauge: fixes the group")
+
+    fig.suptitle(title, y=1.0)
+    return _save(fig, path)
+
+
+def plot_anomaly_scan(points, survivors, path, title: str = "A family, and what survives it"):
+    r"""Every candidate group against the two things that must vanish.
+
+    ``points`` is a sequence of ``(dimension, sixth-order residue, label)`` and
+    ``survivors`` a sequence of ``(dimension, label)``.  The horizontal axis is
+    the gravitational condition -- everything off 496 is out -- and the
+    vertical one the gauge condition, on a symmetric-log scale so that the
+    exact zeros are visible rather than falling off the bottom.
+
+    Only the origin of this picture is a string theory.
+    """
+    points = [(float(d), abs(float(r)), str(name)) for d, r, name in points]
+    fig, ax = _fig(figsize=(7.6, 5.0))
+
+    floor = min((r for _, r, _ in points if r > 0), default=1.0) / 3.0
+    xs = [d for d, _, _ in points]
+    ys = [max(r, 0.0) for _, r, _ in points]
+    ax.set_yscale("symlog", linthresh=floor)
+    ax.scatter(xs, ys, s=12, color="#8899aa", alpha=0.55, label="candidates")
+    ax.axvline(496.0, color="#d62728", lw=1.0, ls=":")
+    ax.axhline(0.0, color="#d62728", lw=1.0, ls=":")
+
+    for slot, (dimension, name) in enumerate(survivors):
+        ax.plot([float(dimension)], [0.0], "*", ms=18, color="#d62728", zorder=5)
+        ax.annotate(
+            name,
+            xy=(float(dimension), 0.0),
+            xytext=(14, 14 + 16 * slot),
+            textcoords="offset points",
+            fontsize=10,
+            color="#d62728",
+            arrowprops={"arrowstyle": "-", "color": "#d62728", "lw": 0.7},
+        )
+    ax.set_xlabel(r"$\dim G$ -- must be 496")
+    ax.set_ylabel(r"largest surviving sixth-order trace -- must be 0")
+    ax.set_title(title)
+    ax.legend(frameon=False, loc="upper right")
     return _save(fig, path)

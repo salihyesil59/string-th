@@ -41,7 +41,7 @@ from fractions import Fraction
 from ..superstring.rns import Sector
 from ..superstring.typeii import Field, vector_spinor, vector_vector
 from ..units import Conventions
-from .lattice import GAUGE_DIMENSION, RootLattice
+from .lattice import RootLattice
 
 __all__ = [
     "LEFT_DIMENSION",
@@ -259,11 +259,19 @@ def massless_content(
 def anomaly_free_dimension() -> int:
     """``496``, what Green-Schwarz cancellation demands of ``dim G`` in ``D = 10``.
 
+    Computed, not quoted: :func:`stringsim.heterotic.anomaly.required_dimension`
+    assembles the ten-dimensional anomaly polynomial out of index densities and
+    solves for the gauge dimension that kills ``tr R^6``.
+
     The lattice produces the same number from modular invariance alone, with no
-    reference to anomalies.  Two unrelated consistency conditions agreeing is
-    the reason the heterotic construction was taken seriously.
+    reference to anomalies -- ``GAUGE_DIMENSION`` is 16 Cartan directions plus
+    480 roots.  Two unrelated consistency conditions agreeing is the reason the
+    heterotic construction was taken seriously, and the test suite checks that
+    the two routes agree rather than sharing a constant.
     """
-    return GAUGE_DIMENSION
+    from .anomaly import required_dimension
+
+    return required_dimension()
 
 
 __all__ += ["anomaly_free_dimension"]
