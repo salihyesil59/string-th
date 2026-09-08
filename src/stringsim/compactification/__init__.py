@@ -14,4 +14,8 @@ projected onto invariant states and new twisted sectors appear at the fixed
 points, with fractional oscillator modes and a shifted ground-state energy.  It
 reuses ``torus``'s ``O(d,d;Z)`` machinery to check that a proposed rotation
 really is a symmetry of the moduli.
+
+``hodge`` reads Hodge numbers off those orbifolds; ``toric`` does the same job
+for Calabi-Yau *hypersurfaces*, where a reflexive lattice polytope and its dual
+are a mirror pair and the two Hodge numbers are one formula read twice.
 """

@@ -44,6 +44,7 @@ __all__ = [
     "animate_boundary_state",
     "animate_cardy_fit",
     "animate_pq_junction",
+    "animate_mirror_plot",
 ]
 
 
@@ -1261,6 +1262,54 @@ def animate_pq_junction(frames, path, fps: int = 14):
             fontsize=11,
         )
         return [*arrows, walk]
+
+    anim = FuncAnimation(fig, draw, frames=len(frames), blit=False)
+    return _save_animation(anim, fig, path, fps)
+
+
+def animate_mirror_plot(frames, path, fps: int = 6):
+    r"""Fill in the Hodge plot and watch it come out symmetric.
+
+    ``frames`` is a sequence of ``(label, points so far)`` with ``points`` a
+    list of ``(h11, h21)``.
+
+    Each family is drawn twice, at :math:`\chi` and at :math:`-\chi`, because
+    the dual polytope is a Calabi-Yau too and its Hodge numbers are the same two
+    in the other order.  So the symmetry is not something the scan discovers --
+    it is there from the first point.  What the scan shows is that the *set* of
+    reachable pairs is populated on both sides, which is the statement that the
+    mirror of a family in the list is also in it.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
+
+    frames = [(str(label), [(int(a), int(b)) for a, b in points]) for label, points in frames]
+    every = frames[-1][1]
+    xs = [2 * (a - b) for a, b in every] + [2 * (b - a) for a, b in every]
+    ys = [a + b for a, b in every] * 2
+
+    fig, ax = plt.subplots(figsize=(7.4, 5.0), dpi=130)
+    fig.subplots_adjust(left=0.11, right=0.97, top=0.90, bottom=0.12)
+    forward = ax.scatter([], [], s=30, color="#1f77b4", alpha=0.85, label=r"from $\Delta^*$")
+    mirrored = ax.scatter([], [], s=30, facecolors="none", edgecolors="#d62728",
+                          linewidths=1.1, label=r"from $\Delta$")
+    ax.axvline(0.0, color="0.5", lw=1.0, ls=":")
+    pad = 0.08 * (max(xs) - min(xs))
+    ax.set_xlim(min(xs) - pad, max(xs) + pad)
+    ax.set_ylim(0.0, max(ys) * 1.12)
+    ax.set_xlabel(r"$\chi = 2(h^{1,1} - h^{2,1})$")
+    ax.set_ylabel(r"$h^{1,1} + h^{2,1}$")
+    ax.grid(alpha=0.25)
+    ax.legend(frameon=False, fontsize=9, loc="upper left")
+
+    def draw(i: int):
+        label, points = frames[i]
+        ahead = np.array([[2 * (a - b), a + b] for a, b in points], dtype=float)
+        behind = np.array([[2 * (b - a), a + b] for a, b in points], dtype=float)
+        forward.set_offsets(ahead if len(ahead) else np.zeros((0, 2)))
+        mirrored.set_offsets(behind if len(behind) else np.zeros((0, 2)))
+        ax.set_title(f"{len(points)} weight systems -- {label}", fontsize=11)
+        return forward, mirrored
 
     anim = FuncAnimation(fig, draw, frames=len(frames), blit=False)
     return _save_animation(anim, fig, path, fps)

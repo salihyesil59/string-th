@@ -25,7 +25,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 1271 checks
+python -m pytest                          # 1300 checks
 ```
 
 ---
@@ -579,6 +579,87 @@ centralizers, so the moduli are the centralizer's *orbits* on the fixed locus
 rather than its components — which needs the fixed points and not just how many
 there are. `hodge_numbers` therefore stays abelian-only, and says so rather than
 returning a number it cannot stand behind.
+
+**Mirror symmetry, as an exchange of a polytope with its dual** —
+`compactification/toric.py`. The section above finds `(51, 3)` and `(3, 51)`
+swapped by a phase, for an orbifold of a torus. Calabi-Yau manifolds that are
+*hypersurfaces* need different machinery, and there mirror symmetry is
+Batyrev's: a reflexive lattice polytope `Delta*` gives a Calabi-Yau, its dual
+`Delta` gives another, and
+
+```
+h^{1,1} = l(Delta*) - (d+1) - sum_facets l*  +  sum_{codim 2} l*(G*) l*(G)
+```
+
+with `l` the lattice points of a face and `l*` those in its relative interior.
+`h^{2,1}` is *the same expression with the two polytopes swapped*, so the mirror
+is the shape of the combinatorics rather than something discovered in it. What
+is left to check is whether the numbers are right.
+
+**The face lattice comes for free.** Two lattice points lie in the relative
+interior of the same face exactly when they sit on the same set of facets, so
+grouping the points by that set is the face lattice, with the interior counts
+already in hand — no recursion, no convex-hull calls beyond the first. A face
+carrying no interior point simply does not appear, which is what the sums want.
+
+**The quintic.** `P^4` gives a reflexive simplex with 6 lattice points; its dual
+has 126, the degree-5 monomials in five variables. Out comes
+
+```
+from Delta*:  (h11, h21) = (1, 101),  chi = -200
+from Delta :  (h11, h21) = (101, 1),  chi = +200
+```
+
+and the Euler characteristic is checked from the other side: `c(T) =
+(1+H)^5/(1+5H)` restricted to a degree-5 hypersurface integrates to `-200`, with
+no polytope anywhere in it.
+
+| family | `(h11, h21)` | `chi` |
+|---|---|---|
+| `P(1,1,1,1,1)[5]` | (1, 101) | −200 |
+| `P(1,1,1,1,2)[6]` | (1, 103) | −204 |
+| `P(1,1,1,1,4)[8]` | (1, 149) | −296 |
+| `P(1,1,1,2,5)[10]` | (1, 145) | −288 |
+| `P(1,1,1,6,9)[18]` | (2, 272) | −540 |
+
+Nothing in the computation knows those numbers; it counts lattice points on
+faces.
+
+**Where the formula stops, shown rather than warned about.** In four dimensions
+it computes Hodge numbers. In three it does not: every K3 has `h^{1,1} = 20`,
+and the quartic's polytope gives 1 while its dual gives 19. The independent
+`chi = 24`, with `h^{2,0} = 1`, forces `b_2 = 22` and `h^{1,1} = 20` — so those
+two numbers are Picard numbers, the part of `H^{1,1}` the toric divisors reach.
+They sum to 20 for the simplest families and not for all:
+
+```
+P(1,1,1,1)[4]     1 + 19 = 20
+P(1,1,1,3)[6]     1 + 19 = 20
+P(1,1,4,6)[12]    2 + 18 = 20
+P(1,1,2,4)[8]     3 + 18 = 21   <-- not 20
+P(1,2,2,5)[10]    6 + 18 = 24   <-- not 20
+```
+
+The difference is divisors no polytope sees. `hodge_numbers` refuses to run
+outside four dimensions rather than put the wrong name on a number.
+
+**Greene and Plesser.** Before Batyrev the mirror of the quintic was found as a
+quotient: the phase symmetries `x_i -> e^{2 pi i a_i / 5} x_i` with
+`sum a_i = 0 mod 5`, of which there are `5^4`, divided by the 5 projective
+scalings — a group of order `5^3 = 125`. Both counts are enumerated, and the
+scalings are worth enumerating: the obvious guess, the smallest exponent, is
+right for the quintic and wrong for `P(1,1,1,2,5)`, whose exponents are
+`(10,10,10,5,2)` and which has 10 scalings rather than 2.
+
+That the quotient is the same manifold as the dual polytope is a theorem. It is
+not computed here — the orbifold cohomology of the quotient needs the fixed
+loci, and this module builds none.
+
+`figures/mirror_hodge.png` is the Hodge plot over 32 weighted projective
+families, symmetric about `chi = 0` because each family is drawn with its dual;
+`figures/reflexive_duality.png` shows three two-dimensional reflexive polygons
+beside their duals, each with the origin as its only interior lattice point; and
+`figures/mirror_plot.gif` fills the plot in one family at a time.
 
 ### 6. The superstring: worldsheet fermions and GSO — `stringsim.superstring`
 
@@ -2007,6 +2088,9 @@ needed. `examples/` produces:
 | `fermion_reflection.gif` | the same pulse, moving -- and coming back upside down in NS |
 | `brane_separation.png` | levels rising as branes separate |
 | `veneziano.png` | the amplitude and its poles |
+| `mirror_hodge.png` | the Hodge plot, symmetric because each family is drawn with its dual |
+| `reflexive_duality.png` | reflexive polygons beside their duals |
+| `mirror_plot.gif` | the same plot filling in one family at a time |
 | `pq_strings.png` | the tension lattice, and a junction with its forces closing |
 | `pq_junction.gif` | the coupling moved, the junction deformed, the polygon still shut |
 | `black_hole_entropy.png` | the count under the Cardy line, and a horizon that forgets its moduli |
@@ -2064,6 +2148,7 @@ python examples/25_vertex_operators.py        # Veneziano from a worldsheet inte
 python examples/26_boundary_states.py         # a brane as a closed string it emits
 python examples/27_black_hole_entropy.py      # Strominger-Vafa, counted and measured
 python examples/28_pq_strings.py              # SL(2,Z), (p,q) tensions, string junctions
+python examples/29_mirror_symmetry.py         # Batyrev, the quintic, (1,101) <-> (101,1)
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -2076,7 +2161,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-1271 checks.  Two minutes on a quiet machine and six on a busy one -- the
+1300 checks.  Two minutes on a quiet machine and six on a busy one -- the
 same suite has been timed at both, so the number is not quoted. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
@@ -2179,7 +2264,14 @@ wrong, not merely if the code changed. A representative sample:
 * the Einstein-frame tension is invariant under `SL(2,Z)` once the charges are
   transformed, to `4e-16`, while the string-frame one moves by a factor of two;
 * a string junction's net force is exactly zero when the charges sum to zero and
-  a fifth of a string tension when they do not, with no angle ever chosen.
+  a fifth of a string tension when they do not, with no angle ever chosen;
+* the quintic's polytope has 6 lattice points and its dual 126 -- the degree-5
+  monomials -- and Batyrev's count gives `(1, 101)` with `chi = -200`, which the
+  classical `integral of c_3` reproduces from Chern classes alone;
+* the same count applied to the dual gives `(101, 1)`, and five weighted
+  projective families come out at their known Hodge numbers;
+* in three dimensions the count is *not* a Hodge number, and the Euler
+  characteristic is what says so: 1 and 19 against `h^{1,1} = 20`.
 
 ---
 
