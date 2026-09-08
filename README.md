@@ -25,7 +25,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 1112 checks
+python -m pytest                          # 1142 checks
 ```
 
 ---
@@ -1394,6 +1394,99 @@ of terms, not hundreds. With the default the invariance check reads `1e-3`
 instead of `1e-11`, and the tests assert that the gap closes when more terms are
 asked for.
 
+**The amplitude, derived** — `amplitudes/vertex.py`. Everything above evaluates
+`B(-alpha(s), -alpha(t))`. That is the answer. This is where it comes from.
+
+A tachyon of momentum `k` is the operator `:e^{ik.X}:`, and on the boundary of
+the disc `<X(y) X(y')> = -2 alpha' log|y - y'|`, so the correlator of four of
+them is
+
+```
+prod_{i<j} |y_i - y_j|^{2 alpha' k_i . k_j},     2 alpha' k_i.k_j = -alpha' s_ij - 2
+```
+
+The disc has an `SL(2,R)` of conformal maps, so three punctures can be nailed
+anywhere and the rest integrated. Fix `y_1 = 0`, `y_3 = 1`, `y_4 = R`, include
+the Faddeev–Popov factor `|y_1-y_3||y_1-y_4||y_3-y_4|`, and integrate `y_2` over
+`(0, 1)` by quadrature:
+
+| `s` | `t` | worldsheet integral | Beta function |
+|---|---|---|---|
+| −2.0 | −2.5 | 0.666666666667 | 0.666666666667 |
+| −3.0 | −1.6 | 1.041666666667 | 1.041666666667 |
+| −1.5 | −1.8 | 2.299287818448 | 2.299287818448 |
+
+Only at `R -> infinity` does the integrand become the Beta integrand. At
+`R = 1.5` it looks nothing like it and gives the same number.
+
+**And the gauge invariance is a mass-shell condition.** What makes the integrand
+transform correctly is that every row of the exponent matrix sums to `-2`:
+
+```
+sum_{j != i} 2 alpha' k_i . k_j = -2 alpha' k_i^2 = -2      <=>   alpha' m^2 = -1
+```
+
+Nothing imposes that in the code — it follows from `s + t + u = -4/alpha'`. So
+it can be *broken*, and then the invariance goes with it, in proportion:
+
+| exponent nudged | by | row residual | gauge spread |
+|---|---|---|---|
+| none | — | 0 | `2e-13` |
+| `e_12` | 0.02 | `2e-2` | `4.7e-3` |
+| `e_24` | 0.05 | `5e-2` | `5.0e-2` |
+| `e_13` | 0.05 | `5e-2` | `2e-13` |
+
+The last row is a blind spot worth naming rather than hiding. Punctures 1 and 3
+sit at 0 and 1 in every gauge of this family — rescaling is itself an `SL(2,R)`
+map — so their separation is exactly 1 and `1^e = 1` whatever `e` is. That is
+consistent rather than a hole: on shell `e_13` is fixed by the others through
+the row sums, and `B(-alpha(s), -alpha(t))` carries no independent `u` either.
+Knowing where a check is blind is part of the check.
+
+**The pole is two punctures colliding.** As `alpha(s) -> 0` the exponent of
+`|y_2 - y_1|` reaches `-1` and the integral stops converging *at its endpoint*.
+Nothing else in the integrand is singular, so the tachyon pole is located in the
+geometry rather than in a special function. Fitting the divergence:
+
+```
+t = -3.0:  residue -0.99999461 against -1
+t = -5.0:  residue -0.99998572 against -1
+```
+
+which is `veneziano_residue(0, t)`, and it does not depend on `t` because the
+tachyon has no spin. Past the pole the ordered integral simply does not exist,
+and `ordered_amplitude` refuses rather than returning a number; the amplitude
+there is *defined* by the continuation the Beta function performs.
+
+**Five punctures, where there is nothing to look up.** Two moduli instead of
+one, and no closed form. The five adjacent invariants are free; the five chords
+are not — the mass-shell conditions are five linear equations for exactly those
+five unknowns, and the module solves them. Then:
+
+```
+amplitude    0.8491043362
+gauge spread 3.8e-14
+cyclic by 1  0.8491043362      cyclic by 2  0.8491043362
+reflected    0.8491043362
+```
+
+The dihedral symmetry of the disc, with the exponent matrix permuted and the
+integral redone from scratch. Nothing in the code enforces it. That the same
+checks keep working where a Beta function is no longer watching is the reason
+for building the machinery rather than quoting the four-point answer.
+
+One thing worth separating. `tachyon_momenta` builds four explicit on-shell
+vectors and `exponents_from_momenta` recovers the same exponent matrix from
+them — but only in the *physical* region, `s` above threshold, which is nowhere
+near where the integral converges. The two facts are unrelated and both are
+worth having: the invariants used everywhere else are the ones real momenta
+give, and the integral that computes with them lives somewhere else entirely.
+
+`figures/koba_nielsen.png` puts the integrand, the comparison and the gauge
+independence side by side; `figures/five_point_moduli.png` draws the moduli
+space of the five-punctured disc; and `figures/pole_emergence.gif` sweeps `s`
+towards the pole and watches it grow out of the end of the integral.
+
 **The partition function, and what the lattice is for** — `amplitudes/narain.py`.
 Section 4 builds `Gamma_{d,d}` and reads a spectrum off it; section 9 integrates
 a modular-invariant density over the fundamental domain. Until now the two never
@@ -1666,6 +1759,9 @@ needed. `examples/` produces:
 | `fermion_reflection.gif` | the same pulse, moving -- and coming back upside down in NS |
 | `brane_separation.png` | levels rising as branes separate |
 | `veneziano.png` | the amplitude and its poles |
+| `koba_nielsen.png` | the integrand, the comparison, and the gauge dropping out |
+| `five_point_moduli.png` | the moduli space of the five-punctured disc |
+| `pole_emergence.gif` | a pole growing out of the end of an integral |
 | `modular_invariance.png` | the two conditions on the lattice, failing separately |
 | `narain_levels.png` | where the charges sit, and which of them are roots |
 | `narain_radius.gif` | a circle's radius swept past the self-dual point |
@@ -1710,6 +1806,7 @@ python examples/21_virasoro_and_ghosts.py     # c from a commutator, D=26 from n
 python examples/22_anomaly_cancellation.py    # 496 and the two groups, from the anomaly
 python examples/23_type_i_orientifold.py      # type I: parity, D9-branes, SO(32) again
 python examples/24_narain_partition.py        # modular invariance, and what the lattice is for
+python examples/25_vertex_operators.py        # Veneziano from a worldsheet integral
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -1722,7 +1819,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-1112 checks, a couple of minutes. They are cross-checks rather than regression
+1142 checks, a couple of minutes. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
@@ -1790,7 +1887,16 @@ wrong, not merely if the code changed. A representative sample:
   digits, which is the factor that cancels against `|eta|^{2d}`;
 * with no compact directions the compactified integrand equals the one
   `oneloop.py` already had, and the roots read off the theta expansion equal the
-  ones `root_vectors` solves for.
+  ones `root_vectors` solves for;
+* the Koba-Nielsen integral over the disc boundary reproduces the Veneziano
+  amplitude to ten digits, from three completely different `SL(2,R)` gauges;
+* nudging one exponent off shell breaks that gauge independence in proportion to
+  the nudge, so the mass-shell condition is doing the work;
+* the residue of the tachyon pole, fitted from where the integral diverges at its
+  endpoint, is `-1` for two different `t`;
+* the five-point amplitude -- which has no closed form -- is unchanged by every
+  cyclic rotation and by the reflection, with the exponent matrix permuted and
+  the integral redone.
 
 ---
 

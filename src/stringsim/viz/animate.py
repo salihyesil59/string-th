@@ -40,6 +40,7 @@ __all__ = [
     "animate_anomaly_sweep",
     "animate_worldsheet_parity",
     "animate_narain_levels",
+    "animate_pole_emergence",
 ]
 
 
@@ -1000,6 +1001,64 @@ def animate_narain_levels(frames, path, fps: int = 12):
         head.set_data([radius], [counts[i]])
         plane.set_title(f"$R = {radius:.3f}$ -- {len(marked)} roots", fontsize=11)
         return scatter, highlight, head
+
+    anim = FuncAnimation(fig, draw, frames=len(frames), blit=False)
+    return _save_animation(anim, fig, path, fps)
+
+
+def animate_pole_emergence(frames, path, fps: int = 10):
+    r"""Watch a pole grow out of the end of an integral.
+
+    ``frames`` is a sequence of ``(alpha_s, x, integrand, residue estimate)``.
+
+    As :math:`\alpha(s)` climbs towards zero the exponent of the leftmost gap
+    reaches :math:`-1`, and the integrand's tail at ``x = 0`` stops being
+    integrable.  Nothing else on the worldsheet changes.  So the tachyon pole
+    of the amplitude is not a feature of a Beta function -- it is the region
+    where two vertex operators sit on top of each other, and the right-hand
+    panel watches the residue it leaves behind settle on ``-1``.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
+
+    frames = [
+        (float(a), np.asarray(x, dtype=float), np.asarray(y, dtype=float), float(r))
+        for a, x, y, r in frames
+    ]
+    ceiling = max(float(np.max(y)) for _, _, y, _ in frames)
+    floor = min(float(np.min(y[y > 0])) for _, _, y, _ in frames)
+    alphas = np.array([a for a, _, _, _ in frames])
+    residues = np.array([r for _, _, _, r in frames])
+
+    fig, (left, right) = plt.subplots(1, 2, figsize=(9.6, 4.2), dpi=130)
+    fig.subplots_adjust(left=0.09, right=0.97, top=0.86, bottom=0.14, wspace=0.3)
+
+    (curve,) = left.plot([], [], lw=2.0, color="#1f77b4")
+    left.set_yscale("log")
+    left.set_xlim(0.0, 1.0)
+    left.set_ylim(floor * 0.7, ceiling * 1.5)
+    left.set_xlabel("$x$, the free puncture")
+    left.set_ylabel("integrand")
+    left.grid(alpha=0.25)
+
+    right.plot(alphas, residues, "-", lw=1.4, color="#2ca02c")
+    (head,) = right.plot([], [], "o", ms=9, color="#d62728")
+    right.axhline(-1.0, color="0.4", lw=1.0, ls="--")
+    right.annotate(
+        "residue $-1$", xy=(alphas[0], -1.0), xytext=(4, 6),
+        textcoords="offset points", fontsize=9, color="0.35",
+    )
+    right.set_xlabel(r"$\alpha(s)$, approaching the pole")
+    right.set_ylabel(r"$\alpha(s)\, A(s,t)$")
+    right.set_ylim(min(residues.min(), -1.05) - 0.05, max(residues.max(), -0.95) + 0.05)
+    right.grid(alpha=0.25)
+
+    def draw(i: int):
+        alpha_s, xs, values, residue = frames[i]
+        curve.set_data(xs, values)
+        head.set_data([alpha_s], [residue])
+        left.set_title(rf"$\alpha(s) = {alpha_s:+.4f}$", fontsize=11)
+        return curve, head
 
     anim = FuncAnimation(fig, draw, frames=len(frames), blit=False)
     return _save_animation(anim, fig, path, fps)

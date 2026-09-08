@@ -53,6 +53,8 @@ __all__ = [
     "plot_worldsheet_surfaces",
     "plot_modular_invariance",
     "plot_narain_levels",
+    "plot_koba_nielsen",
+    "plot_five_point_moduli",
 ]
 
 FUNDAMENTAL_DOMAIN_FLOOR = math.sqrt(3.0) / 2.0
@@ -1671,4 +1673,101 @@ def plot_narain_levels(panels, path, title: str = "Where the charges sit"):
         ax.set_title(f"{label} -- {root_states} roots", fontsize=11)
 
     fig.suptitle(title, y=1.0)
+    return _save(fig, path)
+
+
+def plot_koba_nielsen(curves, comparison, gauges, path, title: str = "The amplitude, derived"):
+    r"""Where the Veneziano amplitude comes from, in three pictures.
+
+    ``curves`` is a sequence of ``(label, x, integrand)``; ``comparison`` a
+    sequence of ``(t, from the integral, from the Beta function)``; ``gauges`` a
+    sequence of ``(label, anchors, amplitudes)``.
+
+    Left: the Koba-Nielsen integrand along the boundary.  As ``s`` climbs
+    towards the first pole the exponent at ``x = 0`` reaches ``-1`` and the area
+    under the curve stops being finite.  The pole is that endpoint.
+
+    Middle: the integral against the closed form, over a range of ``t``.
+
+    Right: the same amplitude computed in different ``SL(2,R)`` gauges.  Flat is
+    the statement that three punctures can be put anywhere; the sloped lines are
+    what happens when the external masses are nudged off shell, which is the
+    condition the flatness rests on.
+    """
+    fig, axes = _fig(1, 3, figsize=(13.2, 4.2))
+    left, middle, right = axes
+
+    for label, xs, values in curves:
+        left.plot(np.asarray(xs, dtype=float), np.asarray(values, dtype=float),
+                  lw=1.6, label=str(label))
+    left.set_yscale("log")
+    left.set_xlabel("$x$, the free puncture")
+    left.set_ylabel("Koba-Nielsen integrand")
+    left.set_title("the pole is an endpoint")
+    left.legend(frameon=False, fontsize=8)
+
+    ts = np.array([row[0] for row in comparison], dtype=float)
+    integral = np.array([row[1] for row in comparison], dtype=float)
+    closed = np.array([row[2] for row in comparison], dtype=float)
+    middle.plot(ts, closed, "-", lw=1.6, color="#2ca02c", label=r"$B(-\alpha(s), -\alpha(t))$")
+    middle.plot(ts, integral, "o", ms=6, mfc="none", color="#1f77b4",
+                label="worldsheet integral")
+    middle.set_xlabel("$t$")
+    middle.set_ylabel("$A(s, t)$")
+    middle.set_title("integral against closed form")
+    middle.legend(frameon=False, fontsize=9)
+
+    styles = ["o-", "s--", "^:"]
+    for (label, anchors, values), style in zip(gauges, styles, strict=False):
+        anchors = np.asarray(anchors, dtype=float)
+        values = np.asarray(values, dtype=float)
+        right.plot(anchors, values / values[0], style, ms=5, mfc="none", label=str(label))
+    right.set_xlabel(r"gauge: where the third puncture is fixed")
+    right.set_ylabel("amplitude, relative to the first")
+    right.set_title("on shell it does not matter")
+    right.legend(frameon=False, fontsize=9)
+
+    fig.suptitle(title, y=1.0)
+    return _save(fig, path)
+
+
+def plot_five_point_moduli(
+    grid, extent, note: str = "", path=None, title: str = "Five punctures, two moduli"
+):
+    r"""The five-point integrand over the moduli space of the punctured disc.
+
+    ``grid`` is the integrand on a square of ``(x, y)`` with ``extent`` the
+    ``(x0, x1, y0, y1)`` it covers; only the triangle ``0 < x < y < 1`` is the
+    integration region and the rest is masked.
+
+    The three corners are where punctures collide -- ``x -> 0``, ``y -> 1``,
+    ``x -> y`` -- and each is a channel of the amplitude.  There is no closed
+    form to check this against; what says the construction is right is that the
+    integral over it does not depend on where the other three punctures were
+    fixed, and ``note`` carries that number.
+    """
+    from matplotlib.colors import LogNorm
+
+    grid = np.asarray(grid, dtype=float)
+    fig, ax = _fig(figsize=(6.4, 5.0))
+    finite = grid[np.isfinite(grid) & (grid > 0)]
+    image = ax.imshow(
+        np.ma.masked_invalid(grid),
+        origin="lower",
+        extent=tuple(float(v) for v in extent),
+        aspect="equal",
+        cmap="viridis",
+        norm=LogNorm(vmin=max(finite.min(), finite.max() * 1e-4), vmax=finite.max()),
+    )
+    ax.plot([0, 1], [0, 1], color="white", lw=1.2, ls="--")
+    ax.set_xlabel("$y_2$")
+    ax.set_ylabel("$y_3$")
+    ax.set_title(title)
+    ax.grid(False)
+    fig.colorbar(image, ax=ax, label="integrand")
+    if note:
+        ax.text(
+            0.03, 0.97, note, transform=ax.transAxes, va="top", fontsize=9,
+            bbox={"boxstyle": "round,pad=0.35", "fc": "white", "ec": "0.75", "lw": 0.8},
+        )
     return _save(fig, path)
