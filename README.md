@@ -25,7 +25,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 1142 checks
+python -m pytest                          # 1180 checks
 ```
 
 ---
@@ -1164,6 +1164,95 @@ being told. Finally `2 kappa_11^2 T_M2 T_M5 = 2 pi` to `1e-16`: the membrane and
 the fivebrane are electric and magnetic sources of the same three-form, so their
 tensions were never independent.
 
+**A brane as a closed string** — `branes/boundary.py`. Above, a D-brane is
+described by what ends on it. It can also be described by what it *emits*: a
+coherent state of closed strings.
+
+Along the brane the endpoint is free and across it the endpoint is nailed down,
+which on the closed-string Hilbert space read the same way:
+
+```
+(alpha_n^mu - S^mu_nu alpha~_{-n}^nu) |B> = 0,     S = -1 along, +1 across
+```
+
+and the state that is supposed to solve them is
+`|B> = exp(sum_n (1/n) alpha_{-n} . S . alpha~_{-n}) |0>`. That is an *ansatz*.
+Expanding it in the explicit Fock space of section 10, applying the operator and
+looking at what is left:
+
+| brane | directions | worst residual over modes 1–3, all directions |
+|---|---|---|
+| D(−1) | 4 | 0 |
+| D0 | 4 | 0 |
+| D1 | 4 | 0 |
+| D2 | 5 | 0 |
+
+Exactly zero — the coefficients are rational and the cancellation is term by
+term. This is what the Fock space of section 10 was built for.
+
+**The worldsheet metric is in the coefficients, and it earns its place.** From
+`[alpha_n^mu, alpha_{-n}^nu] = n eta^{mu nu}`, acting on the exponential brings
+down `S_mu eta_mu` rather than `S_mu`. Leaving the `eta` out:
+
+| direction | 0 (timelike) | 1 | 2 | 3 |
+|---|---|---|---|---|
+| with `eta` | 0 | 0 | 0 | 0 |
+| without | **2.0** | 0 | 0 | 0 |
+
+Only the timelike condition notices. A check on one spatial direction would have
+passed a wrong state — and would have been the obvious check to write.
+
+**Its norm is the Dedekind eta.** The coefficient cancels against the state's
+own norm, whatever the signature, so every diagonal state contributes 1 and the
+overlap is a plain sum over the oscillator degeneracies. Put the ground-state
+energy back and it is `|eta(it)|^{-24}` to `2e-15` — the factor
+`oneloop.closed_channel_integrand` carries. So the cylinder's closed-channel
+oscillator content is the norm of a coherent state, summed here one Fock state
+at a time rather than quoted as a product.
+
+**The sum converges late, and that is the Hagedorn growth being inconvenient.**
+The degeneracies rise like `exp(4 pi sqrt N)`, so the terms grow before they
+fall:
+
+| `q` | levels needed for `1e-13` |
+|---|---|
+| 0.1 | 40 |
+| 0.3 | 100 |
+| 0.5 | 220 |
+
+A cutoff good for the first is off by a factor of two at the last, so every
+number from the sum is quoted next to `overlap_truncation`.
+
+**The same conditions on a moving string.** Classically the gluing is
+`alpha_n = S alpha~_{-n}`, and with `alpha_{-n} = alpha_n*` for a real `X` the
+left-movers are `S alpha_n*` — the conjugate matters as soon as a mode carries a
+phase, and is invisible if every coefficient is real, which is how it gets left
+out. A closed string built that way has, at `tau = 0`:
+
+```
+                             |Xdot| along the brane    |X - y| across it
+glued (a boundary state)              3e-17                  1e-16
+same right-movers, not glued          7.4e-1                 9.9e-1
+```
+
+`figures/boundary_touch.gif` is the picture: at `tau = 0` the glued string lies
+*flat on the brane* — Dirichlet puts every point of it at the brane's transverse
+position and Neumann gives it no velocity along — and then it peels off. The
+string with the same right-movers and unglued left-movers never touches. A
+boundary state is the closed string a brane can emit and reabsorb, and the
+moment it touches is the moment the boundary conditions hold.
+
+**What is not derived.** The zero-mode measure and the normalisation. The ratio
+of the full closed-channel cylinder to the oscillator factor computed here is
+`1.3e2` at `t = 0.6` and `1.4e-1` at `t = 1.2` — the transverse momentum
+integral and the separation exponential, plus a constant that is the brane
+tension. Getting that constant out of the boundary state is Polchinski's
+computation of `T_p`; it is not attempted, and `dbrane.py` supplies the tension
+instead.
+
+`figures/boundary_state.png` shows the sum converging and the norm landing on
+the eta function.
+
 ### 9. Amplitudes — `stringsim.amplitudes`
 
 The Veneziano amplitude `A(s,t) = B(-alpha(s), -alpha(t))`, `alpha(x) = 1 +
@@ -1759,6 +1848,8 @@ needed. `examples/` produces:
 | `fermion_reflection.gif` | the same pulse, moving -- and coming back upside down in NS |
 | `brane_separation.png` | levels rising as branes separate |
 | `veneziano.png` | the amplitude and its poles |
+| `boundary_state.png` | a coherent state's norm converging on the eta function |
+| `boundary_touch.gif` | the closed string that lies flat on the brane, and one that does not |
 | `koba_nielsen.png` | the integrand, the comparison, and the gauge dropping out |
 | `five_point_moduli.png` | the moduli space of the five-punctured disc |
 | `pole_emergence.gif` | a pole growing out of the end of an integral |
@@ -1807,6 +1898,7 @@ python examples/22_anomaly_cancellation.py    # 496 and the two groups, from the
 python examples/23_type_i_orientifold.py      # type I: parity, D9-branes, SO(32) again
 python examples/24_narain_partition.py        # modular invariance, and what the lattice is for
 python examples/25_vertex_operators.py        # Veneziano from a worldsheet integral
+python examples/26_boundary_states.py         # a brane as a closed string it emits
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -1819,7 +1911,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-1142 checks, a couple of minutes. They are cross-checks rather than regression
+1180 checks, a couple of minutes. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
@@ -1896,7 +1988,17 @@ wrong, not merely if the code changed. A representative sample:
   endpoint, is `-1` for two different `t`;
 * the five-point amplitude -- which has no closed form -- is unchanged by every
   cyclic rotation and by the reflection, with the exponent matrix permuted and
-  the integral redone.
+  the integral redone;
+* the boundary state satisfies its gluing conditions *exactly* -- built level by
+  level and the operator applied -- for every mode number, direction and brane
+  dimension, and fails the timelike one by a factor of two if the worldsheet
+  metric is dropped from its coefficients;
+* summing that state's norm over Fock states gives `|eta|^{-24}`, the factor the
+  closed channel of the cylinder carries, agreeing with an independent eta
+  implementation to `2e-15`;
+* a closed string whose modes are glued lies flat on the brane at `tau = 0`,
+  with `|Xdot|` along it and `|X - y|` across it both at round-off, while one
+  built from the same right-movers without the gluing never touches.
 
 ---
 
