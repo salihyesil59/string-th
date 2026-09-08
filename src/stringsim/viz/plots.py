@@ -49,6 +49,8 @@ __all__ = [
     "plot_no_ghost_region",
     "plot_anomaly_conditions",
     "plot_anomaly_scan",
+    "plot_orientifold_spectrum",
+    "plot_worldsheet_surfaces",
 ]
 
 FUNDAMENTAL_DOMAIN_FLOOR = math.sqrt(3.0) / 2.0
@@ -1426,4 +1428,132 @@ def plot_anomaly_scan(points, survivors, path, title: str = "A family, and what 
     ax.set_ylabel(r"largest surviving sixth-order trace -- must be 0")
     ax.set_title(title)
     ax.legend(frameon=False, loc="upper right")
+    return _save(fig, path)
+
+
+def plot_orientifold_spectrum(before, comparison, path, title: str = "Gauging worldsheet parity"):
+    r"""What the projection removes, and what the result agrees with.
+
+    ``before`` is a sequence of ``(sector, kept, removed)`` state counts for the
+    massless level of type IIB.  ``comparison`` is a sequence of
+    ``(label, supergravity, gauge)`` for the finished theories.
+
+    Left: half of type IIB survives, and which half depends on the sector --
+    the symmetric part of NS-NS, the antisymmetric part of R-R, and one
+    diagonal copy of the two mixed sectors.
+
+    Right: type I and the heterotic ``SO(32)`` string, built with nothing in
+    common, at the same massless level and with the same split.
+    """
+    before = [(str(name), int(kept), int(removed)) for name, kept, removed in before]
+    comparison = [(str(name), int(sugra), int(gauge)) for name, sugra, gauge in comparison]
+
+    fig, (left, right) = _fig(1, 2, figsize=(10.8, 4.6))
+
+    labels = [name for name, _, _ in before]
+    kept = np.array([k for _, k, _ in before], dtype=float)
+    gone = np.array([r for _, _, r in before], dtype=float)
+    positions = np.arange(len(labels))
+    left.bar(positions, kept, color="#1f77b4", label="survives")
+    left.bar(positions, gone, bottom=kept, color="0.82", hatch="//", edgecolor="0.55",
+             label="projected out")
+    for x, (k, g) in enumerate(zip(kept, gone, strict=True)):
+        left.text(x, k + g + 1.5, f"{int(k)}", ha="center", fontsize=9, color="#1f77b4")
+    left.set_xticks(positions)
+    left.set_xticklabels(labels, rotation=20, ha="right", fontsize=9)
+    left.set_ylabel("massless states")
+    left.set_title(f"type IIB: {int(kept.sum() + gone.sum())} -> {int(kept.sum())}")
+    left.legend(frameon=False, loc="upper left", fontsize=9)
+
+    names = [name for name, _, _ in comparison]
+    sugra = np.array([s for _, s, _ in comparison], dtype=float)
+    gauge = np.array([g for _, _, g in comparison], dtype=float)
+    positions = np.arange(len(names))
+    right.bar(positions, sugra, color="#2ca02c", label="supergravity")
+    right.bar(positions, gauge, bottom=sugra, color="#ff7f0e", label="gauge")
+    for x, (s, g) in enumerate(zip(sugra, gauge, strict=True)):
+        right.text(x, s + g + 120, f"{int(s + g)}", ha="center", fontsize=10)
+        right.text(x, s + g / 2, f"{int(g)}", ha="center", va="center", fontsize=9, color="white")
+        right.text(x, s / 2, f"{int(s)}", ha="center", va="center", fontsize=9, color="white")
+    right.set_xticks(positions)
+    right.set_xticklabels(names, fontsize=10)
+    right.set_ylabel("massless states")
+    right.set_ylim(0, max(sugra + gauge) * 1.32)
+    right.set_title("two constructions, one spectrum")
+    right.legend(frameon=False, loc="upper center", ncol=2, fontsize=9)
+
+    fig.suptitle(title, y=1.0)
+    return _save(fig, path)
+
+
+_ARROWS = {"up": (0, 1), "down": (0, -1), "left": (-1, 0), "right": (1, 0)}
+
+
+def _edge(ax, start, end, mark, colour):
+    """Draw one side of the identification square."""
+    (x0, y0), (x1, y1) = start, end
+    if mark == "boundary":
+        ax.plot([x0, x1], [y0, y1], color="#d62728", lw=3.5, solid_capstyle="round", zorder=3)
+        return
+    ax.plot([x0, x1], [y0, y1], color=colour, lw=1.6, zorder=3)
+    dx, dy = _ARROWS[mark]
+    mx, my = (x0 + x1) / 2.0, (y0 + y1) / 2.0
+    ax.annotate(
+        "",
+        xy=(mx + 0.16 * dx, my + 0.16 * dy),
+        xytext=(mx - 0.16 * dx, my - 0.16 * dy),
+        arrowprops={"arrowstyle": "-|>", "color": colour, "lw": 1.6},
+        zorder=4,
+    )
+
+
+def plot_worldsheet_surfaces(panels, path, title: str = "The four one-loop worldsheets"):
+    r"""Identification diagrams for the surfaces with ``chi = 0``.
+
+    ``panels`` is a sequence of ``(name, euler, sides)`` where ``sides`` maps
+    ``left, right, top, bottom`` to ``"boundary"`` or an arrow direction.  Two
+    sides carrying arrows are glued; matching directions glue plainly, opposite
+    ones glue with a flip and make the surface unoriented.  A red edge is a
+    genuine boundary, where an open string ends.
+
+    Nothing here is drawn from a picture book: the sides come from whichever
+    ``(g, b, c)`` the caller enumerated, and the caption reports the Euler
+    characteristic that put the surface at one loop.
+    """
+    from matplotlib.patches import Rectangle
+
+    panels = list(panels)
+    rows = (len(panels) + 1) // 2
+    fig, axes = _fig(rows, 2, figsize=(7.8, 3.3 * rows))
+    flat = np.atleast_1d(axes).ravel()
+
+    for ax, (name, euler, sides) in zip(flat, panels, strict=False):
+        ax.set_xlim(-0.45, 1.45)
+        ax.set_ylim(-0.45, 1.45)
+        ax.set_aspect("equal")
+        ax.axis("off")
+        ax.add_patch(Rectangle((0, 0), 1, 1, facecolor="#eef2f7", edgecolor="none", zorder=1))
+        corners = {
+            "bottom": ((0, 0), (1, 0)),
+            "top": ((0, 1), (1, 1)),
+            "left": ((0, 0), (0, 1)),
+            "right": ((1, 0), (1, 1)),
+        }
+        colours = {"left": "#1f77b4", "right": "#1f77b4", "top": "#2ca02c", "bottom": "#2ca02c"}
+        for side, (start, end) in corners.items():
+            _edge(ax, start, end, sides[side], colours[side])
+        ax.set_title(f"{name}   $\\chi = {euler}$", fontsize=11)
+
+    for ax in flat[len(panels):]:
+        ax.axis("off")
+    fig.suptitle(title, y=1.0)
+    fig.text(
+        0.5,
+        0.005,
+        "arrows mark glued sides -- opposite arrows glue with a flip; "
+        "red edges are boundaries",
+        ha="center",
+        fontsize=9,
+        color="0.35",
+    )
     return _save(fig, path)

@@ -1,4 +1,4 @@
-"""stringsim -- a simulation toolkit for the bosonic string.
+"""stringsim -- a simulation toolkit for string theory.
 
 Four areas, each usable on its own:
 

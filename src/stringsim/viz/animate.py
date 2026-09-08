@@ -38,6 +38,7 @@ __all__ = [
     "animate_no_ghost_region",
     "animate_physical_norms",
     "animate_anomaly_sweep",
+    "animate_worldsheet_parity",
 ]
 
 
@@ -853,4 +854,74 @@ def animate_anomaly_sweep(frames, path, fps: int = 3):
         return bars
 
     anim = FuncAnimation(fig, draw, frames=len(frames), blit=False)
+    return _save_animation(anim, fig, path, fps)
+
+
+def animate_worldsheet_parity(panels, path, beads=(0.0, 0.25, 0.5, 0.75), fps: int = 20):
+    r"""What gauging :math:`\Omega` does to a string that is actually moving.
+
+    ``panels`` is a sequence of ``(label, frames)`` where ``frames`` has shape
+    ``(n_tau, n_sigma, 2)`` -- a closed string sampled in two transverse
+    directions over time.  ``beads`` are fractions of the way round the string;
+    each is drawn as a coloured marker.
+
+    **The shape alone cannot show the projection.**  :math:`X(\tau, -\sigma)`
+    traces exactly the same curve as :math:`X(\tau, \sigma)`, backwards, so a
+    string and its image are the same picture.  What differs is *where each
+    point of the string sits on it*, which is what the beads are for: they run
+    round one way in the first panel and the other way in the second.
+
+    In the third the beads collide.  An :math:`\Omega`-even string satisfies
+    :math:`X(\sigma) = X(-\sigma) = X(2\pi - \sigma)`, so it is **folded**:
+    the two halves lie on top of each other and the curve is traced twice.  That
+    is what "half the states survive" looks like on a moving string.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
+
+    panels = [(str(label), np.asarray(frames, dtype=float)) for label, frames in panels]
+    lengths = {frames.shape[0] for _, frames in panels}
+    if len(lengths) != 1:
+        raise ValueError(f"panels disagree on the number of frames: {sorted(lengths)}")
+    n_frames = lengths.pop()
+    stacked = np.concatenate([frames.reshape(-1, 2) for _, frames in panels])
+    lo, hi = stacked.min(axis=0), stacked.max(axis=0)
+    pad = 0.2 * np.maximum(hi - lo, 1e-9)
+    colours = ["#d62728", "#2ca02c", "#9467bd", "#ff7f0e", "#8c564b"]
+
+    fig, axes = plt.subplots(1, len(panels), figsize=(3.7 * len(panels), 4.1), dpi=130)
+    axes = np.atleast_1d(axes)
+    fig.subplots_adjust(left=0.04, right=0.98, top=0.88, bottom=0.06, wspace=0.16)
+
+    curves, markers = [], []
+    for ax, (label, frames) in zip(axes, panels, strict=True):
+        ax.set_xlim(lo[0] - pad[0], hi[0] + pad[0])
+        ax.set_ylim(lo[1] - pad[1], hi[1] + pad[1])
+        ax.set_aspect("equal")
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_title(label, fontsize=11)
+        (curve,) = ax.plot([], [], color="#1f77b4", lw=2.2, zorder=2)
+        curves.append(curve)
+        row = []
+        for slot in range(len(beads)):
+            (dot,) = ax.plot([], [], "o", ms=8, color=colours[slot % len(colours)], zorder=3)
+            row.append(dot)
+        markers.append(row)
+        del frames
+
+    def draw(i: int):
+        artists = []
+        for curve, row, (_, frames) in zip(curves, markers, panels, strict=True):
+            shape = frames[i]
+            closed = np.vstack([shape, shape[:1]])
+            curve.set_data(closed[:, 0], closed[:, 1])
+            artists.append(curve)
+            for dot, fraction in zip(row, beads, strict=True):
+                index = int(round(fraction * shape.shape[0])) % shape.shape[0]
+                dot.set_data([shape[index, 0]], [shape[index, 1]])
+                artists.append(dot)
+        return artists
+
+    anim = FuncAnimation(fig, draw, frames=n_frames, blit=False)
     return _save_animation(anim, fig, path, fps)

@@ -3,8 +3,8 @@
 A simulation toolkit for string theory. It solves the worldsheet equations
 numerically, counts the quantum states, identifies which particle each vibration
 is, and reproduces the classic results — the critical dimension, the Regge
-trajectory, T-duality, orbifold twisted sectors, the type II spectra and the two
-heterotic strings — as computed output rather than quoted facts.
+trajectory, T-duality, orbifold twisted sectors, all five superstring theories
+and the two heterotic lattices — as computed output rather than quoted facts.
 
 It starts with the bosonic string, where every step can be watched, and builds
 up: circle, torus, orbifold, superstring, heterotic, heterotic on a torus. Both
@@ -25,7 +25,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 1032 checks
+python -m pytest                          # 1063 checks
 ```
 
 ---
@@ -709,6 +709,107 @@ motion, the boundary conditions, the mode numbers, the period doubling and
 `G_-`, which is bilinear in different fields. It is not the Grassmann field, so
 the fermion bilinear in `T_{++}` and the anticommutator algebra stay algebraic,
 in `rns.py`.
+
+**Type I, the fifth theory** — `superstring/orientifold.py`. IIA, IIB and the
+two heterotic strings were here; this was the one that was not. It is not a new
+worldsheet — it is type IIB with worldsheet parity **gauged**.
+
+`Omega` exchanges left- and right-movers and squares to one, so it can be
+gauged, and gauging it keeps only the invariant states: the string becomes
+unoriented. Sector by sector on the massless level of IIB,
+
+| sector | product | survives | states |
+|---|---|---|---|
+| NS-NS | `8v x 8v` | symmetric part | 36 — graviton and dilaton |
+| R-R | `8s x 8s` | antisymmetric part | 28 — `C_2` |
+| NS-R, R-NS | exchanged | one diagonal copy | 64 — gravitino, dilatino |
+
+Which irreducible pieces land in which half is *found*, not assigned: the only
+subset of `{1, 28, 35}` summing to `n(n+1)/2 = 36` is `{1, 35}`, and the code
+checks that the dimensions leave no ambiguity before believing it. Ask the same
+question of IIA's `8s x 8c` and it refuses — that product is not a square of one
+space, so exchange does not act on it at all.
+
+**The Ramond-Ramond sign is usually quoted as part of the definition. It cannot
+be anything else.** Keeping the symmetric part there would leave 72 bosons
+against 64 fermions, which no supermultiplet can be. Keeping the antisymmetric
+part leaves 64 and 64 — exactly the `N = 1` supergravity multiplet of ten
+dimensions, which is *also* what the heterotic string's massless level contains.
+The sign is chosen here by counting, not by fiat.
+
+**The open sector is not optional.** An unoriented closed string alone carries a
+Ramond-Ramond tadpole. Cancelling it needs D9-branes, and `Omega` acts on their
+Chan-Paton factors as `lambda -> ± gamma lambda^T gamma^-1`, leaving `so(n)` for
+symmetric `gamma` and `sp(n/2)` for antisymmetric.
+
+**How many branes, and where the number comes from.** Not from the tadpole: the
+three unoriented one-loop amplitudes are *not* built here, and the section below
+says exactly what is and is not computed about them. From the equivalent
+condition. The anomaly polynomial of the previous section gives `dim G = 496`,
+and `n(n-1)/2 = 496` has one root:
+
+```
+n = 32,     gauge group SO(32)
+n(n+1)/2 = 496  has no integer root, so the symplectic projection is out
+```
+
+That is **SO(32) for the third time**, and the three routes share no step: an
+even self-dual lattice, a twelve-form anomaly polynomial, and a projection on
+Chan-Paton factors.
+
+**And then the whole massless level agrees.**
+
+| | type I | heterotic `SO(32)` |
+|---|---|---|
+| supergravity | 128 | 128 |
+| gauge | 7936 | 7936 |
+| **total** | **8064** | **8064** |
+
+One side gauges a worldsheet symmetry and counts Chan-Paton indices; the other
+enumerates the roots of an even self-dual lattice. The agreement is the massless
+shadow of the strong-weak duality between them.
+
+**Why exactly four diagrams at one loop.** A surface contributes at order
+`g_s^-chi` with `chi = 2 - 2g - b - c`. Setting `chi = 0` and enumerating gives
+four solutions and no more — torus, Klein bottle, cylinder, Möbius strip — and
+which of them a theory has is decided by whether it is oriented and whether it
+has boundaries. `figures/worldsheet_surfaces.png` draws all four as
+identification diagrams.
+
+**The same projection, watched instead of counted.** On a classical solution
+`Omega` is just `sigma -> -sigma`, which swaps the left- and right-moving mode
+coefficients. That the swap really is the reflection is checked to `0`, not
+assumed. Then:
+
+```
+                          |X(sigma) - X(-sigma)| / size
+travelling                          1.732
+its Omega image                     1.732
+the Omega-even part                 2.1e-16
+```
+
+The invariant solution has equal chiralities, so it is a standing wave — an
+unoriented string cannot carry a wave that goes round it.
+
+There is a trap in drawing this, and it is worth naming. `X(tau, -sigma)` traces
+*exactly the same curve* as `X(tau, sigma)`, backwards, so a string and its
+parity image are the same picture and no shape can tell them apart. What differs
+is where each point of the string sits on that curve.
+`figures/worldsheet_parity.gif` marks four points and lets them move: they run
+round one way, then the other, and in the invariant case they **collide** — an
+`Omega`-even string satisfies `X(sigma) = X(2 pi - sigma)`, so it is folded in
+half and the curve is traced twice. That is what "half the states survive" looks
+like on something that is moving.
+
+**What is not computed.** The tadpole itself. In the transverse channel the
+cylinder is `<B|B>`, the Klein bottle `<C|C>` and the Möbius strip the cross
+term, so their sum is `<nB + C | nB + C>` — a perfect square in `n` whose double
+root is the charge that must cancel. The square, its vanishing discriminant and
+its root are computed; the crosscap's charge of `-32` is **passed in**, because
+extracting it needs the three amplitudes with their relative normalisations and
+the modular maps between channels, which this package does not build for the
+superstring. It appears at all only because it agrees with the count the anomaly
+forces.
 
 ### 7. Heterotic strings: two theories, and only two — `stringsim.heterotic`
 
@@ -1471,6 +1572,9 @@ needed. `examples/` produces:
 | `fermion_reflection.gif` | the same pulse, moving -- and coming back upside down in NS |
 | `brane_separation.png` | levels rising as branes separate |
 | `veneziano.png` | the amplitude and its poles |
+| `orientifold_spectrum.png` | what parity removes, and the spectrum it leaves twice over |
+| `worldsheet_surfaces.png` | the four one-loop surfaces as identification diagrams |
+| `worldsheet_parity.gif` | a string, its parity image, and the folded invariant |
 | `anomaly_conditions.png` | the two conditions ten dimensions imposes, both crossing zero |
 | `anomaly_scan.png` | 819 candidate groups against the two that must vanish |
 | `anomaly_sweep.gif` | `SO(N)` swept: the terms nothing can absorb, shrinking to zero |
@@ -1507,6 +1611,7 @@ python examples/19_shifts.py                  # the shift that repairs T-duality
 python examples/20_non_abelian.py             # Delta(27), and what generalises
 python examples/21_virasoro_and_ghosts.py     # c from a commutator, D=26 from norms
 python examples/22_anomaly_cancellation.py    # 496 and the two groups, from the anomaly
+python examples/23_type_i_orientifold.py      # type I: parity, D9-branes, SO(32) again
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -1519,7 +1624,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-1032 checks, a couple of minutes. They are cross-checks rather than regression
+1063 checks, a couple of minutes. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
@@ -1571,7 +1676,15 @@ wrong, not merely if the code changed. A representative sample:
 * the `A-hat` and `L` series agree with the products they came from, the error
   falling by 256 for every halving, as a truncation after the twelve-form must;
 * the anomaly polynomial and the root lattice both give `dim G = 496` with no
-  shared constant, and of 819 candidate groups exactly two cancel.
+  shared constant, and of 819 candidate groups exactly two cancel;
+* the orientifold projection leaves 64 bosons and 64 fermions with one choice of
+  the Ramond-Ramond sign and 72 against 64 with the other, so supersymmetry
+  picks the projection rather than the projection being assumed;
+* type I and the heterotic `SO(32)` string agree on the whole massless level,
+  8064 states split 128 and 7936, from constructions that share no step;
+* swapping a closed string's two chiralities equals reflecting `sigma`, exactly,
+  and the invariant combination's `|X(sigma) - X(-sigma)|` is round-off while a
+  travelling one's is of order its own size.
 
 ---
 
@@ -1609,6 +1722,16 @@ wrong, not merely if the code changed. A representative sample:
   construction, which proves it, is not implemented -- neither are DDF
   operators, which would exhibit the positive-norm basis directly instead of
   counting eigenvalue signs.
+
+* **The type I tadpole.** The orientifold projection, the Chan-Paton
+  projection and the resulting spectrum are computed; the Klein bottle, the
+  cylinder and the Mobius strip are not.  What the module does with the tadpole
+  is its *shape* -- a perfect square whose double root is the charge to cancel
+  -- with the crosscap's `-32` passed in rather than derived.  Getting it out
+  would need those three amplitudes with their relative normalisations and the
+  modular maps between direct and transverse channels, none of which is built
+  here for the superstring.  The number is taken from anomaly cancellation
+  instead, which is the equivalent condition and *is* computed.
 
 * **Anomaly cancellation beyond one family.** The twelve-form is assembled
   and solved, and the search covers products of `SO(N)` and `E_8`.  It is not a
@@ -1655,6 +1778,8 @@ wrong, not merely if the code changed. A representative sample:
   D = 10 gauge theory and superstring theory*, Phys. Lett. B **149** (1984) 117.
 * L. Alvarez-Gaume and E. Witten, *Gravitational anomalies*, Nucl. Phys. B
   **234** (1984) 269 -- the index densities used here.
+* A. Sagnotti, *Open strings and their symmetry groups*, in *Non-perturbative
+  quantum field theory* (Cargese 1987) -- the orientifold construction.
 * P. Goddard and C. B. Thorn, *Compatibility of the dual Pomeron with unitarity
   and the absence of ghosts in the dual resonance model*, Phys. Lett. B **40**
   (1972) 235.
