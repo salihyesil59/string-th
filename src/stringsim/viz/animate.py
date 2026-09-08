@@ -41,6 +41,7 @@ __all__ = [
     "animate_worldsheet_parity",
     "animate_narain_levels",
     "animate_pole_emergence",
+    "animate_boundary_state",
 ]
 
 
@@ -1061,4 +1062,65 @@ def animate_pole_emergence(frames, path, fps: int = 10):
         return curve, head
 
     anim = FuncAnimation(fig, draw, frames=len(frames), blit=False)
+    return _save_animation(anim, fig, path, fps)
+
+
+def animate_boundary_state(panels, brane, path, fps: int = 20):
+    r"""A closed string that touches the brane, beside one that does not.
+
+    ``panels`` is a sequence of ``(label, frames)`` with ``frames`` of shape
+    ``(n_tau, n_sigma, 2)``; ``brane`` is the transverse position of the brane,
+    drawn as a line.
+
+    At :math:`\tau = 0` the glued string lies *flat on the brane*: the
+    Dirichlet condition puts every point of it at the brane's transverse
+    position, and the Neumann one gives it no velocity along the brane.  Then it
+    peels off.  That is what the coherent state means -- a boundary state is the
+    closed string the brane can emit and reabsorb, and the moment it touches is
+    the moment the boundary conditions hold.
+
+    The second panel is a closed string with unglued modes.  It never lies on
+    the brane at all, which is what makes the first panel a statement rather
+    than a picture.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
+
+    panels = [(str(label), np.asarray(frames, dtype=float)) for label, frames in panels]
+    lengths = {frames.shape[0] for _, frames in panels}
+    if len(lengths) != 1:
+        raise ValueError(f"panels disagree on the number of frames: {sorted(lengths)}")
+    n_frames = lengths.pop()
+    stacked = np.concatenate([frames.reshape(-1, 2) for _, frames in panels])
+    lo, hi = stacked.min(axis=0), stacked.max(axis=0)
+    pad = 0.18 * np.maximum(hi - lo, 1e-9)
+
+    fig, axes = plt.subplots(1, len(panels), figsize=(4.4 * len(panels), 4.3), dpi=130)
+    axes = np.atleast_1d(axes)
+    fig.subplots_adjust(left=0.06, right=0.98, top=0.86, bottom=0.12, wspace=0.2)
+
+    curves, touches = [], []
+    for ax, (label, _) in zip(axes, panels, strict=True):
+        ax.axhline(float(brane), color="#d62728", lw=3.0, alpha=0.85, zorder=1)
+        ax.set_xlim(lo[0] - pad[0], hi[0] + pad[0])
+        ax.set_ylim(lo[1] - pad[1], hi[1] + pad[1])
+        ax.set_xlabel("along the brane")
+        ax.set_ylabel("across it")
+        ax.set_title(label, fontsize=11)
+        ax.grid(alpha=0.25)
+        (curve,) = ax.plot([], [], lw=2.2, color="#1f77b4", zorder=3)
+        curves.append(curve)
+        touches.append(ax)
+
+    def draw(i: int):
+        for curve, ax, (label, frames) in zip(curves, touches, panels, strict=True):
+            shape = frames[i]
+            closed = np.vstack([shape, shape[:1]])
+            curve.set_data(closed[:, 0], closed[:, 1])
+            gap = float(np.max(np.abs(shape[:, 1] - brane)))
+            curve.set_color("#d62728" if gap < 1e-6 else "#1f77b4")
+            ax.set_title(f"{label}   (gap {gap:.2f})", fontsize=11)
+        return curves
+
+    anim = FuncAnimation(fig, draw, frames=n_frames, blit=False)
     return _save_animation(anim, fig, path, fps)

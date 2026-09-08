@@ -55,6 +55,7 @@ __all__ = [
     "plot_narain_levels",
     "plot_koba_nielsen",
     "plot_five_point_moduli",
+    "plot_boundary_state",
 ]
 
 FUNDAMENTAL_DOMAIN_FLOOR = math.sqrt(3.0) / 2.0
@@ -1770,4 +1771,50 @@ def plot_five_point_moduli(
             0.03, 0.97, note, transform=ax.transAxes, va="top", fontsize=9,
             bbox={"boxstyle": "round,pad=0.35", "fc": "white", "ec": "0.75", "lw": 0.8},
         )
+    return _save(fig, path)
+
+
+def plot_boundary_state(series, eta_curve, path, title: str = "A brane as a closed string"):
+    r"""The coherent state's norm, and the function it turns out to be.
+
+    ``series`` is a sequence of ``(label, cutoffs, relative errors)`` -- how far
+    the truncated sum over Fock states is from the product, against where it was
+    cut.  ``eta_curve`` is ``(moduli, from the boundary state, from eta)``.
+
+    Left: the sum converges late, and later the larger ``q`` is.  That is the
+    Hagedorn growth of the degeneracies seen from the inconvenient side: the
+    terms rise before they fall.
+
+    Right: with the ground-state energy put back, the norm is
+    :math:`|\eta|^{-24}` -- the factor the closed channel of the cylinder
+    carries.  The markers come from summing over states, the line from the eta
+    product.
+    """
+    fig, (left, right) = _fig(1, 2, figsize=(10.6, 4.3))
+
+    for label, cutoffs, errors in series:
+        cutoffs = np.asarray(cutoffs, dtype=float)
+        errors = np.maximum(np.asarray(errors, dtype=float), 1e-17)
+        left.semilogy(cutoffs, errors, "o-", ms=4, mfc="none", label=str(label))
+    left.axhline(1e-13, color="0.4", lw=1.0, ls="--")
+    left.annotate(
+        "machine precision", xy=(0.02, 1e-13), xycoords=("axes fraction", "data"),
+        xytext=(0, 5), textcoords="offset points", fontsize=8, color="0.35",
+    )
+    left.set_xlabel("levels summed")
+    left.set_ylabel("relative error against the product")
+    left.set_title("the sum converges late")
+    left.legend(frameon=False, fontsize=9)
+
+    moduli, from_state, from_eta = (np.asarray(a, dtype=float) for a in eta_curve)
+    right.semilogy(moduli, from_eta, "-", lw=1.6, color="#2ca02c",
+                   label=r"$|\eta(i t)|^{-24}$")
+    right.semilogy(moduli, from_state, "o", ms=6, mfc="none", color="#1f77b4",
+                   label=r"$\langle B | q^{(N+\tilde N)/2} | B\rangle$")
+    right.set_xlabel("modulus $t$")
+    right.set_ylabel("oscillator factor")
+    right.set_title("the norm is the eta function")
+    right.legend(frameon=False, fontsize=9)
+
+    fig.suptitle(title, y=1.0)
     return _save(fig, path)
