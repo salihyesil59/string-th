@@ -56,6 +56,7 @@ __all__ = [
     "plot_koba_nielsen",
     "plot_five_point_moduli",
     "plot_boundary_state",
+    "plot_black_hole_entropy",
 ]
 
 FUNDAMENTAL_DOMAIN_FLOOR = math.sqrt(3.0) / 2.0
@@ -1814,6 +1815,51 @@ def plot_boundary_state(series, eta_curve, path, title: str = "A brane as a clos
     right.set_xlabel("modulus $t$")
     right.set_ylabel("oscillator factor")
     right.set_title("the norm is the eta function")
+    right.legend(frameon=False, fontsize=9)
+
+    fig.suptitle(title, y=1.0)
+    return _save(fig, path)
+
+
+def plot_black_hole_entropy(curves, scans, path, title: str = "An entropy, counted and measured"):
+    r"""The microscopic count against Cardy, and the horizon against its moduli.
+
+    ``curves`` is a sequence of ``(label, sqrt(N), log d_N, cardy line)``;
+    ``scans`` a sequence of ``(label, couplings, entropies)``.
+
+    Left: the exact logarithms climb towards the Cardy line and stay below it at
+    every level that can be reached.  That is not a failure -- it is the
+    subleading ``log N``, which is why the exponent has to be fitted rather than
+    read off a ratio.
+
+    Right: the Bekenstein-Hawking entropy against the string coupling.  Flat, for
+    every charge, because an entropy counts states and cannot depend on a
+    continuous modulus.  The dashed line is the same calculation with one power
+    changed, and it is not flat.
+    """
+    fig, (left, right) = _fig(1, 2, figsize=(10.8, 4.4))
+
+    colours = ["#1f77b4", "#2ca02c", "#ff7f0e", "#9467bd"]
+    for (label, roots, counted, cardy), colour in zip(curves, colours, strict=False):
+        roots = np.asarray(roots, dtype=float)
+        left.plot(roots, np.asarray(cardy, dtype=float), "--", lw=1.2, color=colour)
+        left.plot(roots, np.asarray(counted, dtype=float), "-", lw=1.8, color=colour,
+                  label=str(label))
+    left.set_xlabel(r"$\sqrt{N}$")
+    left.set_ylabel(r"$\log d_N$")
+    left.set_title("solid: the count.  dashed: $2\\pi\\sqrt{Q_1Q_5N}$")
+    left.legend(frameon=False, fontsize=9, loc="upper left")
+
+    styles = ["o-", "s-", "^--", "v--"]
+    for (label, couplings, values), style, colour in zip(scans, styles, colours, strict=False):
+        couplings = np.asarray(couplings, dtype=float)
+        values = np.asarray(values, dtype=float)
+        right.plot(couplings, values / values[0], style, ms=5, mfc="none", color=colour,
+                   label=str(label))
+    right.axhline(1.0, color="0.5", lw=0.9)
+    right.set_xlabel("string coupling $g_s$")
+    right.set_ylabel("entropy, relative to the first")
+    right.set_title("the horizon forgets the moduli")
     right.legend(frameon=False, fontsize=9)
 
     fig.suptitle(title, y=1.0)
