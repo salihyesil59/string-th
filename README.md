@@ -25,7 +25,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 902 checks
+python -m pytest                          # 1003 checks
 ```
 
 ---
@@ -147,7 +147,10 @@ measured  -0.083333333328     exact  -0.083333333333     error  4.9e-12
 Hence `a = (D-2)/24`, and `a = 1` — forced by Lorentz invariance, since a
 massive vector cannot be built from only `D-2` oscillators — gives `D = 26`. The
 conformal-anomaly route, `c = D - 26 = 0`, is implemented separately and agrees;
-the superstring versions give `D = 10` by both routes.
+the superstring versions give `D = 10` by both routes.  Both of those are
+anomaly arguments; section 10 derives the same 26 a third time, from whether
+the physical states have positive norm, and gets `c = D` out of a commutator
+rather than a formula.
 
 **Which particle is which vibration** (`states.py`). The little group fixes the
 identification — `SO(D-2)` for a massless state, `SO(D-1)` for a massive one:
@@ -1192,7 +1195,140 @@ of terms, not hundreds. With the default the invariance check reads `1e-3`
 instead of `1e-11`, and the tests assert that the gap closes when more terms are
 asked for.
 
-### 10. Figures and animations — `stringsim.viz`
+### 10. The Virasoro algebra, and `D = 26` from unitarity — `stringsim.quantum.virasoro`
+
+Everything above *counts* states. This section *builds* them, and uses them to
+derive the critical dimension a third time — by a route that mentions no
+anomaly at all.
+
+**An explicit Fock space** (`fock.py`). A basis element is a multiset of
+creation operators acting on `|0; p>`:
+
+```
+alpha_{-1}^0 alpha_{-1}^3 alpha_{-2}^1 |0; p>      recorded as ((1,0), (1,3), (2,1))
+```
+
+The creation operators commute among themselves, so a multiset is a faithful
+label and no ordering convention is needed. Counting the basis reproduces
+`prod (1-q^n)^{-D}` exactly — the same partition function as section 2, reached
+by enumerating multisets rather than expanding a product:
+
+```
+D = 26, levels 0..4:   1, 26, 377, 3978, 33930
+```
+
+The metric is `diag(-1, +1, ..., +1)` and that is the whole point. Because
+`eta^00 = -1`, a single timelike oscillator has negative norm,
+`<0| alpha_1^0 alpha_{-1}^0 |0> = -1`. **The full Fock space has ghosts in every
+dimension.** The critical dimension is not about that; it is about what survives
+the constraints. Since `eta` is diagonal the basis is orthogonal, so the Gram
+matrix is diagonal with exact integer entries — which matters, because the whole
+argument turns on *signs* of eigenvalues.
+
+**The central charge, read off a commutator.** `L_m` is assembled as a matrix
+from the oscillators, term by term, with a summation range that is derived
+rather than guessed (widening it by six terms in each direction changes nothing
+— the test suite checks). Then
+
+```
+[L_m, L_-m] = 2m L_0 + (c/12)(m^3 - m)
+```
+
+is evaluated and `c` is whatever is left over. The number is never written down:
+
+| `D` | from `[L_2, L_-2]` | from `[L_3, L_-3]` | zeta route |
+|---|---|---|---|
+| 4 | 4.0000 | 4.0000 | 4.0000 |
+| 10 | 10.0000 | 10.0000 | 10.0000 |
+| 26 | 26.0000 | 26.0000 | 26.0000 |
+
+The central terms differ by a factor of four between `m = 2` and `m = 3`; the
+`c` extracted from them does not. `L_0` built the same way comes out diagonal
+with eigenvalue `alpha' p^2 + N` — the formula is derived, not substituted — and
+the commutators with no central term (`[L_1,L_2] = -L_3`, `[L_2,L_-1] = 3L_1`)
+close to **1e-15**.
+
+**Physical states.** Only `L_1` and `L_2` are imposed. `L_3` and `L_4`
+annihilate the result to **1e-16** without ever being asked to, which is what
+`[L_1, L_2] = -L_3` means and what a wrongly built algebra would break.
+
+Level 1 gives `D - 2` positive-norm states and one null, *in every dimension* —
+the familiar `zeta . p = 0` with `zeta ~ p` pure gauge. Level 1 cannot see 26,
+which is why the argument has to go one level up.
+
+**Two bounds, pointing opposite ways.** At level 2 with `a = 1`:
+
+| `D` | positive | null | ghosts | light-cone | `SO(D-1)` sym traceless |
+|---|---|---|---|---|---|
+| 24 | 276 | 23 | 0 | 275 | 275 |
+| 25 | 300 | 24 | 0 | 299 | 299 |
+| **26** | **324** | **26** | **0** | **324** | **324** |
+| 27 | 350 | 26 | **1** | 350 | 350 |
+| 28 | 377 | 27 | **1** | 377 | 377 |
+
+* **No negative norms** holds up to 26 and fails at 27 — an *upper* bound.
+* **The positive-norm count equals the light-cone count** from 26 upward; below
+  26 the covariant spectrum carries one state the light cone does not, a scalar
+  on top of the symmetric traceless tensor — a *lower* bound.
+
+Neither alone gives 26. Together they leave exactly one dimension, and that is
+the derivation. Seen from the third side: at `D = 26` the extra scalar becomes
+**null**: the null count is `D - 1` in every dimension except 26, where there
+is one more. A null state decouples from every inner product, so the two
+spectra coincide.
+
+The light-cone number comes from the partition function of section 2, the
+`SO(D-1)` number from a Young-tableau dimension formula, and the covariant
+number from diagonalising a Gram matrix. None of the three knows about the other
+two, and all three agree at 26.
+
+**The ghost is a real state.** At `D = 27` the negative-norm direction is not an
+artefact of a failed constraint: `L_1`, `L_2`, `L_3`, `L_4` all annihilate it to
+**1e-16** and `L_0` returns the intercept, while its norm is `-1.9e-2` against a
+null-eigenvalue gap of `1e-15`. Magnitudes here are basis-dependent and only the
+signs are not — Sylvester's law of inertia — so the counts are what the module
+reports.
+
+**And it is not a frame artefact.** Boosting the momentum moves every physical
+state (they are polarisation tensors) but leaves the signature `324 / 26 / 0`
+untouched.
+
+**One level is a necessary condition, not the theorem.** Scanning the intercept
+at level 2 and locating where the smallest norm crosses zero:
+
+| `D` | first ghost below `a = 1` |
+|---|---|
+| ≤ 25 | none — the whole line `a < 1` is clean |
+| 26 | `a = +0.375000000000` |
+| 27 | `a = +0.174306090567` |
+| 28 | `a = -0.000000000000` |
+
+So level 2 leaves a window at `D = 26` for `a < 3/8` that looks consistent and
+is not. Level 3 closes it: there the only ghost-free intercept at `D = 26` is
+`a = 1` — the value `(D-2)/24` gives, by a route that never mentions norms.
+Level 3 also reproduces the dimension boundary, with ghosts arriving in force
+rather than one at a time:
+
+| `D` | positive | null | ghosts | light-cone |
+|---|---|---|---|---|
+| 25 | 2876 | 324 | 0 | 2852 |
+| **26** | **3200** | **375** | **0** | **3200** |
+| 27 | 3575 | 377 | **26** | 3575 |
+
+**What this does not prove.** The no-ghost theorem is a statement about every
+level at once; three levels are three levels. What is shown here is that the
+region the computation leaves open shrinks to the known answer as the level
+rises, and that at the level where the classic argument places the boundary, the
+boundary is there.
+
+`figures/central_charge.png` puts the measured `c` on the line `c = D`;
+`figures/ghost_onset.png` draws the two bounds meeting; `figures/physical_norms.gif`
+follows the single state whose norm depends on `D` as it slides down and reaches
+zero at 26; and `figures/no_ghost_region.png` with its animation sweeps the
+`(D, a)` plane, watching the allowed region close around the one point `a = 1`,
+`D = 26`.
+
+### 11. Figures and animations — `stringsim.viz`
 
 GIFs are written with matplotlib's Pillow writer, so no external binary is
 needed. `examples/` produces:
@@ -1237,6 +1373,11 @@ needed. `examples/` produces:
 | `fermion_reflection.gif` | the same pulse, moving -- and coming back upside down in NS |
 | `brane_separation.png` | levels rising as branes separate |
 | `veneziano.png` | the amplitude and its poles |
+| `central_charge.png` | `c` read off a commutator, against `c = D` |
+| `ghost_onset.png` | two bounds on `D`, pointing opposite ways, meeting at 26 |
+| `no_ghost_region.png` | the `(D, a)` plane, coloured by the smallest physical norm |
+| `no_ghost_region.gif` | the same plane filling in as the intercept rises |
+| `physical_norms.gif` | the one state whose norm depends on `D`, crossing zero |
 
 ---
 
@@ -1263,6 +1404,7 @@ python examples/17_hodge_numbers.py           # (51, 3) <-> (3, 51), from fixed 
 python examples/18_matrix_model.py            # D0-brane dynamics, strings, chaos
 python examples/19_shifts.py                  # the shift that repairs T-duality
 python examples/20_non_abelian.py             # Delta(27), and what generalises
+python examples/21_virasoro_and_ghosts.py     # c from a commutator, D=26 from norms
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -1275,7 +1417,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-902 checks, a couple of minutes. They are cross-checks rather than regression
+1003 checks, a couple of minutes. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
@@ -1309,7 +1451,18 @@ wrong, not merely if the code changed. A representative sample:
   the zero-charge torus momenta;
 * `U(N) -> U(k) x U(N-k)` never increases the number of massless vectors;
 * the Virasoro–Shapiro residues are stable under halving the offset, which is
-  what "simple pole" means.
+  what "simple pole" means;
+* the oscillator basis counted by enumerating multisets has exactly the sizes
+  the partition function predicts, in every dimension tried;
+* `c` extracted from `[L_2, L_-2]` and from `[L_3, L_-3]` -- whose central
+  terms differ by a factor of four -- equals `D` with a deviation of zero, bit
+  for bit, and equals what `zeta.py` gets by regularising mode sums;
+* physical states built by imposing only `L_1` and `L_2` are annihilated by
+  `L_3` and `L_4` to `1e-16`, and the physical signature is unchanged under a
+  boost of the momentum;
+* the level-2 physical spectrum is ghost-free exactly up to `D = 26` and meets
+  the light-cone count exactly from `D = 26` up, so the two bounds intersect in
+  one dimension -- and level 3 gives the same edge.
 
 ---
 
@@ -1319,7 +1472,10 @@ wrong, not merely if the code changed. A representative sample:
   `psi^mu` as a real commuting field, which is exact for the transport, the
   boundary conditions, the mode numbers and the supercurrent, but cannot
   represent the anticommutator algebra or the fermion bilinear in `T_{++}`.
-  Those stay algebraic.
+  Those stay algebraic.  The Fock space of section 10 is the bosonic one only:
+  a fermionic tower would need a Clifford representation rather than multisets,
+  and without it the super-Virasoro algebra, its `c = 3D/2`, and the no-ghost
+  analysis that gives `D = 10` are not reachable by the same route.
 * **Eleven-dimensional dynamics, and the quantum matrix model.** The M2/M5
   tensions and their reductions are computed, but the supergravity fields, the
   M5 worldvolume theory and the Matrix-model *definition* are not; `mtheory` is
@@ -1336,6 +1492,15 @@ wrong, not merely if the code changed. A representative sample:
   the untwisted forms work for any finite group, but the blow-up count would need
   centralizer orbits on the fixed loci. Overlapping loci, the resolution itself
   and curved compactifications are out of scope entirely.
+* **The no-ghost theorem.** Section 10 builds the physical states and
+  diagonalises their Gram matrix at levels 1, 2 and 3.  That is a computation
+  at three levels, not a proof about all of them: what it shows is that the
+  region left open shrinks to the known answer as the level rises, and that the
+  boundary sits where the classic argument puts it.  The Goddard-Thorn
+  construction, which proves it, is not implemented -- neither are DDF
+  operators, which would exhibit the positive-norm basis directly instead of
+  counting eigenvalue signs.
+
 * **Higher genus, and amplitudes with insertions.** The one-loop vacuum diagram
   and its moduli space are computed; two loops, vertex operators on the torus,
   and the annulus with different branes at the two ends are not.
@@ -1366,6 +1531,11 @@ wrong, not merely if the code changed. A representative sample:
   Lett. **54** (1985) 502.
 * J. H. Conway and N. J. A. Sloane, *Sphere Packings, Lattices and Groups*,
   ch. 4 — the even self-dual lattices and their classification.
+* R. C. Brower, *Spectrum-generating algebra and no-ghost theorem for the dual
+  model*, Phys. Rev. D **6** (1972) 1655.
+* P. Goddard and C. B. Thorn, *Compatibility of the dual Pomeron with unitarity
+  and the absence of ghosts in the dual resonance model*, Phys. Lett. B **40**
+  (1972) 235.
 
 ---
 

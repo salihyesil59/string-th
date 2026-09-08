@@ -44,6 +44,9 @@ __all__ = [
     "plot_lyapunov",
     "plot_shift_landscape",
     "plot_commutation",
+    "plot_central_charge",
+    "plot_ghost_onset",
+    "plot_no_ghost_region",
 ]
 
 FUNDAMENTAL_DOMAIN_FLOOR = math.sqrt(3.0) / 2.0
@@ -1138,4 +1141,189 @@ def plot_commutation(panels, path, title: str | None = None) -> Path:
         ax.set_yticks([])
         ax.grid(False)
     fig.suptitle(title or "Commuting pairs: what the Euler characteristic sums over", fontsize=11)
+    return _save(fig, path)
+
+
+def plot_central_charge(
+    dims, measured, path, title: str = "Central charge from the algebra"
+) -> Path:
+    r"""Measured ``c`` against the line ``c = D``.
+
+    ``measured`` is a mapping ``{m: [c for each dim]}``, one series per
+    commutator :math:`[L_m, L_{-m}]` used to extract it.  Different ``m`` give
+    different central terms -- :math:`(m^3-m)/12` is 1/2 at ``m = 2`` and 2 at
+    ``m = 3`` -- so the series landing on the same line is the check, not the
+    line itself.
+
+    A residual panel would be the usual way to show how close this is, but the
+    residual is not close: it is zero to the last bit, at every point plotted.
+    A log axis cannot draw that, so the figure states it instead.
+    """
+    dims = np.asarray(list(dims), dtype=float)
+    fig, ax = _fig(figsize=(6.8, 4.6))
+    ax.plot(dims, dims, color="0.4", lw=1.0, ls="--", label="c = D")
+    markers = ["o", "s", "^", "D"]
+    worst = 0.0
+    for (m, values), marker in zip(sorted(measured.items()), markers, strict=False):
+        values = np.asarray(values, dtype=float)
+        worst = max(worst, float(np.max(np.abs(values - dims))))
+        ax.plot(
+            dims,
+            values,
+            marker,
+            ms=7,
+            mfc="none",
+            label=f"from $[L_{{{m}}}, L_{{-{m}}}]$",
+        )
+    ax.set_xlabel("spacetime dimension $D$")
+    ax.set_ylabel("central charge $c$")
+    ax.set_title(title)
+    ax.legend(frameon=False, loc="upper left")
+    exact = "exactly, bit for bit" if worst == 0.0 else f"to {worst:.1e}"
+    ax.text(
+        0.97,
+        0.06,
+        f"$|c - D| = 0$ {exact}, for every point and both commutators",
+        transform=ax.transAxes,
+        ha="right",
+        va="bottom",
+        fontsize=9,
+        color="0.25",
+        bbox={"boxstyle": "round,pad=0.4", "fc": "white", "ec": "0.75", "lw": 0.8},
+    )
+    return _save(fig, path)
+
+
+def plot_ghost_onset(
+    records, lightcone_counts, path, title: str = "The critical dimension from unitarity"
+) -> Path:
+    r"""Two bounds on ``D``, pointing opposite ways, meeting at 26.
+
+    ``records`` is a sequence of
+    :class:`~stringsim.quantum.virasoro.Inertia`, one per dimension, and
+    ``lightcone_counts`` the matching light-cone degeneracies.
+
+    Left: the smallest norm in the physical subspace.  It is non-negative up
+    to 26 and turns over after it -- an upper bound.
+
+    Right: how many states the covariant construction has that the light cone
+    does not, and how many of them are ghosts.  The excess is 1 below 26 and 0
+    from 26 on -- a lower bound.  Only at 26 are both zero.
+    """
+    records = list(records)
+    dims = np.array([r.dim for r in records], dtype=float)
+    smallest = np.array([r.smallest for r in records])
+    negative = np.array([r.negative for r in records], dtype=float)
+    excess = np.array([r.positive for r in records], dtype=float) - np.asarray(
+        list(lightcone_counts), dtype=float
+    )
+
+    fig, axes = _fig(1, 2, figsize=(10.4, 4.3))
+    left, right = axes
+
+    left.axhline(0.0, color="0.3", lw=1.0)
+    left.plot(dims, smallest, "o-", ms=4, color="#1f77b4")
+    left.fill_between(dims, smallest, 0.0, where=smallest < 0, color="#d62728", alpha=0.25)
+    left.set_xlabel("spacetime dimension $D$")
+    left.set_ylabel("smallest physical norm")
+    left.set_title("negative norms appear above 26")
+
+    right.axhline(0.0, color="0.3", lw=1.0)
+    right.plot(dims, excess, "o-", ms=4, color="#2ca02c", label="covariant $-$ light-cone")
+    right.plot(dims, negative, "s-", ms=4, color="#d62728", label="ghosts")
+    right.set_xlabel("spacetime dimension $D$")
+    right.set_ylabel("state count")
+    right.set_title("the two counts agree only at 26")
+    right.legend(frameon=False, loc="upper left")
+
+    for ax in axes:
+        ax.axvline(26.0, color="0.55", lw=1.0, ls=":")
+        ax.annotate(
+            "$D = 26$",
+            xy=(26.0, ax.get_ylim()[1]),
+            xytext=(-4, -12),
+            textcoords="offset points",
+            ha="right",
+            fontsize=9,
+            color="0.35",
+        )
+    fig.suptitle(title, y=1.0)
+    return _save(fig, path)
+
+
+def plot_no_ghost_region(
+    dims, intercepts, grid, path, boundary=None, title: str = "Where the ghosts are"
+) -> Path:
+    r"""The ``(D, a)`` plane, coloured by the smallest physical norm.
+
+    ``grid`` is what :func:`~stringsim.quantum.virasoro.no_ghost_map` returns:
+    rows indexed by dimension, columns by intercept, each entry normalised by
+    the largest eigenvalue magnitude in its own cell so that different ``D``
+    are comparable.  Blue is ghost-free, red is not.
+
+    ``boundary`` may be a sequence of ``(dim, a)`` pairs from
+    :func:`~stringsim.quantum.virasoro.ghost_boundary` -- the crossing that
+    exists only for ``D >= 26``.
+
+    The horizontal line at ``a = 1`` is where the normal-ordering constant
+    actually sits in ``D = 26``; the picture shows that it is a single point on
+    the boundary of the allowed region, not an interior choice.
+    """
+    from matplotlib.colors import TwoSlopeNorm
+
+    dims = np.asarray(list(dims), dtype=float)
+    intercepts = np.asarray(intercepts, dtype=float)
+    grid = np.asarray(grid, dtype=float)
+    limit = max(float(np.max(np.abs(grid))), 1e-12)
+
+    fig, ax = _fig(figsize=(7.4, 5.0))
+    mesh = ax.imshow(
+        grid,
+        origin="lower",
+        aspect="auto",
+        cmap="RdBu",
+        norm=TwoSlopeNorm(vmin=-limit, vcenter=0.0, vmax=limit),
+        extent=(
+            float(intercepts[0]),
+            float(intercepts[-1]),
+            float(dims[0]) - 0.5,
+            float(dims[-1]) + 0.5,
+        ),
+    )
+    ax.contour(
+        intercepts,
+        dims,
+        grid,
+        levels=[0.0],
+        colors="k",
+        linewidths=1.2,
+    )
+    if boundary is not None:
+        pairs = [(d, a) for d, a in boundary if a is not None]
+        if pairs:
+            ax.plot(
+                [a for _, a in pairs],
+                [d for d, _ in pairs],
+                "wo",
+                ms=5,
+                mec="k",
+                label="root of the smallest norm",
+            )
+            ax.legend(frameon=False, loc="lower left", fontsize=9)
+    ax.axhline(26.0, color="0.2", lw=1.0, ls=":")
+    ax.axvline(1.0, color="0.2", lw=1.0, ls=":")
+    ax.plot([1.0], [26.0], "k*", ms=13)
+    ax.annotate(
+        "$a = 1$, $D = 26$",
+        xy=(1.0, 26.0),
+        xytext=(-8, 8),
+        textcoords="offset points",
+        ha="right",
+        fontsize=9,
+    )
+    ax.set_xlabel("intercept $a$")
+    ax.set_ylabel("spacetime dimension $D$")
+    ax.set_title(title)
+    ax.grid(False)
+    fig.colorbar(mesh, ax=ax, label="smallest physical norm (normalised)")
     return _save(fig, path)

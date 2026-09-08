@@ -20,6 +20,7 @@ from .compactification.circle import extra_massless_states, self_dual_radius
 from .quantum.partition import fit_hagedorn
 from .quantum.spectrum import closed_bosonic_spectrum, open_bosonic_spectrum
 from .quantum.states import closed_massless_content, open_level_content
+from .quantum.virasoro import central_charge_from_algebra, critical_dimension_from_norms
 from .quantum.zeta import central_charge, critical_dimension, regularised_sum
 from .units import Conventions
 
@@ -43,6 +44,10 @@ def summary(conventions: Conventions | None = None) -> str:
         add(f"  {theory:<12s} D = {d:>3d}   central charge {central_charge(d, theory):+.1f}")
     est = regularised_sum()
     add(f"  zeta(-1) measured {est.value:.10f} against {est.exact:.10f}")
+    measured_c = central_charge_from_algebra(conv.dim, m=2, level=0)
+    add(f"  c read off [L_2, L_-2] in D = {conv.dim}: {measured_c:.6f}")
+    add(f"  largest ghost-free D from the physical norms at level 2: "
+        f"{critical_dimension_from_norms(level=2)}")
     add("")
 
     add("Open bosonic spectrum, alpha' M^2 = N - 1")

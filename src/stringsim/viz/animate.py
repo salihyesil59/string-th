@@ -35,6 +35,8 @@ __all__ = [
     "animate_modular_reduction",
     "animate_fuzzy_sphere",
     "animate_matrix_eigenvalues",
+    "animate_no_ghost_region",
+    "animate_physical_norms",
 ]
 
 
@@ -651,4 +653,155 @@ def animate_matrix_eigenvalues(
         return (points, marker, *trails)
 
     anim = FuncAnimation(fig, update, frames=len(times), blit=False)
+    return _save_animation(anim, fig, path, fps)
+
+
+def animate_no_ghost_region(dims, intercepts, grid, path, fps: int = 8) -> Path:
+    r"""Sweep the intercept and watch the ghost-free region close.
+
+    ``grid`` is a precomputed :func:`~stringsim.quantum.virasoro.no_ghost_map`
+    -- rows indexed by dimension, columns by intercept.  Recomputing it per
+    frame would be the same work several dozen times over, so the animation
+    only draws.
+
+    Left, the smallest physical norm across dimensions at the current ``a``,
+    with everything below zero shaded: that band is the set of dimensions the
+    theory has already lost.  Right, the ``(D, a)`` map filling in column by
+    column.
+
+    At ``a`` well below 1 no dimension in the window is excluded.  As ``a``
+    rises the band eats down from large ``D``, reaching 26 exactly as ``a``
+    reaches 1 -- and one step past ``a = 1`` the band covers every dimension,
+    which is why the intercept cannot be treated as a free parameter.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
+    from matplotlib.colors import TwoSlopeNorm
+
+    dims = np.asarray(list(dims), dtype=float)
+    intercepts = np.asarray(intercepts, dtype=float)
+    grid = np.asarray(grid, dtype=float)
+    limit = max(float(np.max(np.abs(grid))), 1e-12)
+    norm = TwoSlopeNorm(vmin=-limit, vcenter=0.0, vmax=limit)
+    extent = (
+        float(intercepts[0]),
+        float(intercepts[-1]),
+        float(dims[0]) - 0.5,
+        float(dims[-1]) + 0.5,
+    )
+
+    fig, (left, right) = plt.subplots(1, 2, figsize=(10.6, 4.4), dpi=130)
+    fig.subplots_adjust(wspace=0.28)
+
+    (curve,) = left.plot([], [], "o-", ms=4, color="#1f77b4")
+    shade = [None]
+    left.axhline(0.0, color="0.3", lw=1.0)
+    left.axvline(26.0, color="0.55", lw=1.0, ls=":")
+    left.set_xlim(dims[0] - 0.5, dims[-1] + 0.5)
+    left.set_ylim(-limit * 1.1, limit * 1.1)
+    left.set_xlabel("spacetime dimension $D$")
+    left.set_ylabel("smallest physical norm")
+    left.grid(alpha=0.25)
+
+    masked = np.full_like(grid, np.nan)
+    image = right.imshow(
+        masked, origin="lower", aspect="auto", cmap="RdBu", norm=norm, extent=extent
+    )
+    marker = right.axvline(intercepts[0], color="k", lw=1.0)
+    right.axhline(26.0, color="0.2", lw=1.0, ls=":")
+    right.set_xlabel("intercept $a$")
+    right.set_ylabel("spacetime dimension $D$")
+    right.set_title("the $(D, a)$ plane")
+    fig.colorbar(image, ax=right, label="smallest norm (normalised)")
+
+    def frame(j: int):
+        column = grid[:, j]
+        curve.set_data(dims, column)
+        if shade[0] is not None:
+            shade[0].remove()
+        shade[0] = left.fill_between(
+            dims, column, 0.0, where=column < 0, color="#d62728", alpha=0.3
+        )
+        drawn = np.full_like(grid, np.nan)
+        drawn[:, : j + 1] = grid[:, : j + 1]
+        image.set_data(drawn)
+        marker.set_xdata([intercepts[j], intercepts[j]])
+        lost = int(np.sum(column < 0))
+        left.set_title(f"$a = {intercepts[j]:+.2f}$ -- {lost} dimensions excluded")
+        return curve, image, marker
+
+    anim = FuncAnimation(fig, frame, frames=len(intercepts), blit=False)
+    return _save_animation(anim, fig, path, fps)
+
+
+def animate_physical_norms(spectra, trace, path, fps: int = 2) -> Path:
+    r"""The physical Gram spectrum, dimension by dimension, and one point crossing.
+
+    ``spectra`` is a sequence of ``(dim, eigenvalues)``.  ``trace`` is the value
+    to follow underneath, one number per entry -- see the example script, which
+    sets aside the generic gauge nulls and takes the smallest of what is left.
+    It has to be supplied rather than derived here: the plain minimum sits on
+    the null pile until ``D`` passes 26 and would show a flat line and then a
+    cliff, hiding the very thing that moves.
+
+    Top: every physical norm as a strip.  Most sit in tight clusters -- the
+    null pile at the origin, the bulk further out -- and one lone point drifts
+    left as ``D`` rises.  Bottom: that point, drawn in as the frames advance.
+
+    Nothing else moves.  The critical dimension is the frame where the lone
+    point reaches zero.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
+
+    spectra = [(int(d), np.asarray(v, dtype=float)) for d, v in spectra]
+    dims = np.array([d for d, _ in spectra], dtype=float)
+    trace = np.asarray(list(trace), dtype=float)
+    if trace.size != dims.size:
+        raise ValueError(f"trace has {trace.size} values for {dims.size} spectra")
+    span = max(float(np.max(np.abs(v))) for _, v in spectra)
+    reach = max(float(np.max(np.abs(trace))), 1e-3) * 1.3
+
+    fig, (strip, below) = plt.subplots(
+        2, 1, figsize=(7.8, 5.4), dpi=130, gridspec_kw={"height_ratios": [1.0, 1.4]}
+    )
+    fig.subplots_adjust(left=0.11, right=0.97, top=0.90, bottom=0.10, hspace=0.55)
+
+    scatter = strip.scatter([], [], s=14, color="#1f77b4", alpha=0.55)
+    (marked,) = strip.plot([], [], "v", ms=11, color="#d62728", zorder=5)
+    strip.axvspan(-0.4 * span, 0.0, color="#d62728", alpha=0.08)
+    strip.axvline(0.0, color="0.3", lw=1.0)
+    strip.set_xlim(-0.35 * span, 1.08 * span)
+    strip.set_ylim(-1.0, 1.0)
+    strip.set_yticks([])
+    strip.set_xlabel("physical Gram eigenvalue")
+    strip.grid(alpha=0.25, axis="x")
+
+    below.axhline(0.0, color="0.3", lw=1.0)
+    below.axvline(26.0, color="0.55", lw=1.0, ls=":")
+    below.axhspan(-reach, 0.0, color="#d62728", alpha=0.08)
+    (history,) = below.plot([], [], "o-", ms=4, color="#1f77b4")
+    (head,) = below.plot([], [], "o", ms=9, color="#d62728")
+    below.set_xlim(dims[0] - 0.5, dims[-1] + 0.5)
+    below.set_ylim(-reach, reach)
+    below.set_xlabel("spacetime dimension $D$")
+    below.set_ylabel("the state that moves")
+    below.grid(alpha=0.25)
+
+    def frame(i: int):
+        dim, values = spectra[i]
+        jitter = np.linspace(-0.75, 0.75, values.size)
+        scatter.set_offsets(np.column_stack([values, jitter]))
+        marked.set_data([trace[i]], [0.0])
+        history.set_data(dims[: i + 1], trace[: i + 1])
+        head.set_data([dims[i]], [trace[i]])
+        negative = int(np.sum(values < -1e-8 * span))
+        word = "negative norm" if negative == 1 else "negative norms"
+        fig.suptitle(
+            f"$D = {dim}$ -- {negative} {word}",
+            color="#d62728" if negative else "#2ca02c",
+        )
+        return scatter, marked, history, head
+
+    anim = FuncAnimation(fig, frame, frames=len(spectra), blit=False)
     return _save_animation(anim, fig, path, fps)
