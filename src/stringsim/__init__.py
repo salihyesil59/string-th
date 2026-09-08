@@ -13,6 +13,8 @@ Four areas, each usable on its own:
     function, the normal-ordering constant from zeta regularisation, the
     critical dimension, the particle content of the low levels (tachyon,
     photon, graviton / Kalb-Ramond / dilaton), and the Hagedorn temperature.
+    Also an explicit Fock space and the Virasoro generators built on it, which
+    give ``c = D`` from a commutator and ``D = 26`` from unitarity.
 
 ``stringsim.compactification``
     A closed string on a circle: Kaluza-Klein momenta, winding, T-duality and
