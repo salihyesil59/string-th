@@ -25,7 +25,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 1202 checks
+python -m pytest                          # 1271 checks
 ```
 
 ---
@@ -1164,6 +1164,84 @@ being told. Finally `2 kappa_11^2 T_M2 T_M5 = 2 pi` to `1e-16`: the membrane and
 the fivebrane are electric and magnetic sources of the same three-form, so their
 tensions were never independent.
 
+**`(p, q)` strings, and a junction that balances itself** — `branes/pq.py`.
+Type IIB has a fundamental string and a D1-brane, and they are not different
+kinds of object. `SL(2,Z)` acts on the axio-dilaton `tau = C_0 + i/g_s` and
+rotates one into the other, so what exists is a lattice of strings labelled by
+coprime integers, with
+
+```
+T_{p,q} = |p + q tau| / 2 pi alpha'
+```
+
+At `(1,0)` that is `1/2 pi alpha'`, the fundamental string. At `(0,1)` and
+`C_0 = 0` it is `1/2 pi alpha' g_s` — which is what `dp_brane_tension` returns
+for a D1, computed with no mention of duality anywhere in it.
+
+**The formula is not written down; it comes from eleven dimensions.** Type IIB
+on a circle is M-theory on a torus, and a `(p,q)` string is an M2-brane wrapping
+the `(p,q)` cycle. A cycle of a torus with modulus `tau` and side `L` has length
+`L |p + q tau|`, so the wrapped membrane has tension `T_M2 L |p + q tau|`.
+Matching the `(1,0)` case to the fundamental string forces the side:
+
+```
+g_s = 0.2:  L = 1.2566370614   2 pi R_11 = 1.2566370614
+g_s = 0.7:  L = 4.3982297150   2 pi R_11 = 4.3982297150
+g_s = 1.5:  L = 9.4247779608   2 pi R_11 = 9.4247779608
+```
+
+It is the circumference of the M-theory circle. Nothing was fitted —
+`l_p^3 = g_s alpha'^{3/2}` does it — and both factors come from `mtheory.py`,
+which has never heard of `SL(2,Z)`. The two routes to `T_{p,q}` then agree to
+`1e-16` for every charge and every coupling.
+
+**What the duality preserves is not the tension.** Under
+`tau -> (a tau + b)/(c tau + d)` the charges go to `(p, q) -> (pd + qb, pc + qa)`
+— read off the algebra, not fitted — and it is `|p + q tau| / sqrt(Im tau)`, the
+Einstein-frame tension, that does not move. The string-frame one moves by a
+factor of two under `S`, and should: a duality changes which string is being
+called fundamental. `S` sends `(1,0)` to `(0,1)`; `T` sends `(0,1)` to `(1,1)`,
+which is a D1-brane acquiring fundamental charge from the axion.
+
+**A junction balances because charge is conserved, and for no other reason.** A
+BPS `(p,q)` string is not free to point where it likes: its direction is the
+phase of `p + q tau`, and its tension the modulus. So the net force at a meeting
+point is
+
+```
+sum_i T_i n_i  =  (1/2 pi alpha') [ sum_i p_i  +  tau sum_i q_i ]
+```
+
+which vanishes exactly when the charges do. Mechanical equilibrium and charge
+conservation are one equation. For `(2,1) + (-1,1) + (-1,-2)` the residual is
+`0.0e+00` at every coupling tried; for `(1,0) + (0,1) + (-1,0)`, which fails to
+conserve, it is a fifth of a string tension.
+
+**Which charges are one string.** `|p + q tau| < |p| + |q||tau|` unless the two
+terms are parallel, so a `(p,q)` string is lighter than the `p` fundamental
+strings and `q` D1-branes it is made of — the triangle inequality is the
+binding energy. It is a genuine bound state only for `gcd(p,q) = 1`; `(2,2)`
+weighs exactly twice `(1,1)` and binds by nothing.
+
+**And the same group folds the coupling.** `fundamental_domain_representative`
+is reused unchanged from section 9, where it says the string has no ultraviolet
+region. Here it says that a strongly-coupled type IIB vacuum is a weakly-coupled
+one with the strings relabelled:
+
+```
+  g_s    C_0        reduced tau         g_s'    matrix
+ 8.00   0.00   +0.0000+8.0000i         0.125   [[0, -1], [1, 0]]
+ 1.70  -3.40   -0.2095+1.1625i         0.860   [[-1, -4], [1, 3]]
+```
+
+At `g_s = 8` the relabelling is `S`, the coupling comes back as `1/8`, and the
+fundamental string there is the D1-brane here.
+
+`figures/pq_strings.png` puts the tension lattice against the coupling — the F1
+flat, the D1 falling, crossing at `g_s = 1` — beside a junction drawn at two
+couplings with its force vectors closing; `figures/pq_junction.gif` moves `tau`
+and watches the junction deform while the polygon stays shut.
+
 **A black hole's entropy, counted and then measured** — `branes/entropy.py`.
 The D1-D5-P system — `Q_1` D1-branes on a circle, `Q_5` D5-branes on
 `T^4 x S^1`, and `N` units of momentum along the circle — is a black hole in the
@@ -1929,6 +2007,8 @@ needed. `examples/` produces:
 | `fermion_reflection.gif` | the same pulse, moving -- and coming back upside down in NS |
 | `brane_separation.png` | levels rising as branes separate |
 | `veneziano.png` | the amplitude and its poles |
+| `pq_strings.png` | the tension lattice, and a junction with its forces closing |
+| `pq_junction.gif` | the coupling moved, the junction deformed, the polygon still shut |
 | `black_hole_entropy.png` | the count under the Cardy line, and a horizon that forgets its moduli |
 | `cardy_fit.gif` | `2 pi` being measured out of a list of integers |
 | `boundary_state.png` | a coherent state's norm converging on the eta function |
@@ -1983,6 +2063,7 @@ python examples/24_narain_partition.py        # modular invariance, and what the
 python examples/25_vertex_operators.py        # Veneziano from a worldsheet integral
 python examples/26_boundary_states.py         # a brane as a closed string it emits
 python examples/27_black_hole_entropy.py      # Strominger-Vafa, counted and measured
+python examples/28_pq_strings.py              # SL(2,Z), (p,q) tensions, string junctions
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -1995,7 +2076,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-1202 checks.  Two minutes on a quiet machine and six on a busy one -- the
+1271 checks.  Two minutes on a quiet machine and six on a busy one -- the
 same suite has been timed at both, so the number is not quoted. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
@@ -2091,7 +2172,14 @@ wrong, not merely if the code changed. A representative sample:
   coupling, the compactification volume, the circle radius and `alpha'`, and
   moves with any of them if one power is put back by hand;
 * the two entropies agree to twelve digits for every charge and every set of
-  moduli, with the ratio a single number rather than a function of anything.
+  moduli, with the ratio a single number rather than a function of anything;
+* the `(0,1)` string's tension is the D1 tension `dbrane.py` already had, and an
+  M2-brane wrapping the `(p,q)` cycle of a torus reproduces the whole formula
+  with the cycle's side forced to be the M-theory circumference;
+* the Einstein-frame tension is invariant under `SL(2,Z)` once the charges are
+  transformed, to `4e-16`, while the string-frame one moves by a factor of two;
+* a string junction's net force is exactly zero when the charges sum to zero and
+  a fifth of a string tension when they do not, with no angle ever chosen.
 
 ---
 

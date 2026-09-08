@@ -43,6 +43,7 @@ __all__ = [
     "animate_pole_emergence",
     "animate_boundary_state",
     "animate_cardy_fit",
+    "animate_pq_junction",
 ]
 
 
@@ -1187,6 +1188,79 @@ def animate_cardy_fit(frames, target, path, fps: int = 6):
         left.set_title(f"levels up to {n_max}", fontsize=11)
         right.set_title(f"slope {slope:.5f}   ({abs(slope / target - 1):.1e} off)", fontsize=11)
         return points, model, head
+
+    anim = FuncAnimation(fig, draw, frames=len(frames), blit=False)
+    return _save_animation(anim, fig, path, fps)
+
+
+def animate_pq_junction(frames, path, fps: int = 14):
+    r"""Move the coupling and watch a junction change shape.
+
+    ``frames`` is a sequence of ``(tau, charges, residual)``.
+
+    A BPS :math:`(p,q)` string is not free to point where it likes: its
+    direction is the phase of :math:`p + q\tau`.  So a junction is a rigid
+    object whose shape the coupling sets, and moving :math:`\tau` deforms it
+    while it stays in equilibrium -- the force vectors close into a polygon at
+    every frame, because the charges have not changed.
+
+    The right-hand panel is those vectors laid tip to tail.  It closes, always,
+    and the number beside it is how far from closing.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
+
+    frames = [
+        (complex(tau), tuple((int(p), int(q)) for p, q in charges), float(residual))
+        for tau, charges, residual in frames
+    ]
+    colours = ["#1f77b4", "#2ca02c", "#ff7f0e", "#9467bd", "#8c564b"]
+    count = len(frames[0][1])
+
+    fig, (rays, polygon) = plt.subplots(1, 2, figsize=(9.0, 4.4), dpi=130)
+    fig.subplots_adjust(left=0.04, right=0.97, top=0.86, bottom=0.06, wspace=0.15)
+
+    arrows, labels = [], []
+    for slot in range(count):
+        colour = colours[slot % len(colours)]
+        (line,) = rays.plot([], [], lw=2.2, color=colour, solid_capstyle="round")
+        arrows.append(line)
+        labels.append(rays.text(0, 0, "", ha="center", va="center", fontsize=9, color=colour))
+    rays.plot([0], [0], "o", ms=7, color="black", zorder=4)
+    for ax, title in ((rays, "the junction"), (polygon, "force vectors, tip to tail")):
+        ax.set_xlim(-1.45, 1.45)
+        ax.set_ylim(-1.45, 1.45)
+        ax.set_aspect("equal")
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        ax.set_title(title, fontsize=11)
+    (walk,) = polygon.plot([], [], "-o", ms=4, lw=1.6, color="0.35")
+
+    def draw(i: int):
+        tau, charges, residual = frames[i]
+        vectors = [complex(p) + complex(q) * tau for p, q in charges]
+        scale = max(abs(v) for v in vectors)
+        for line, label, (p, q), vector in zip(arrows, labels, charges, vectors, strict=True):
+            direction = vector / abs(vector)
+            line.set_data([0.0, direction.real], [0.0, direction.imag])
+            line.set_linewidth(1.0 + 3.5 * abs(vector) / scale)
+            spot = direction * 1.2
+            label.set_position((spot.real, spot.imag))
+            label.set_text(f"({p},{q})")
+        trail = [0j]
+        for vector in vectors:
+            trail.append(trail[-1] + vector / scale)
+        centre = sum(trail) / len(trail)
+        points = np.array([[z.real - centre.real, z.imag - centre.imag] for z in trail])
+        walk.set_data(points[:, 0], points[:, 1])
+        fig.suptitle(
+            rf"$\tau = {tau.real:+.2f} {tau.imag:+.2f}i$   "
+            rf"($g_s = {1.0 / tau.imag:.2f}$)   net force {residual:.1e}",
+            fontsize=11,
+        )
+        return [*arrows, walk]
 
     anim = FuncAnimation(fig, draw, frames=len(frames), blit=False)
     return _save_animation(anim, fig, path, fps)
