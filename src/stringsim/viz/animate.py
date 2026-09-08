@@ -37,6 +37,7 @@ __all__ = [
     "animate_matrix_eigenvalues",
     "animate_no_ghost_region",
     "animate_physical_norms",
+    "animate_anomaly_sweep",
 ]
 
 
@@ -804,4 +805,52 @@ def animate_physical_norms(spectra, trace, path, fps: int = 2) -> Path:
         return scatter, marked, history, head
 
     anim = FuncAnimation(fig, frame, frames=len(spectra), blit=False)
+    return _save_animation(anim, fig, path, fps)
+
+
+def animate_anomaly_sweep(frames, path, fps: int = 3):
+    r"""Sweep ``N`` through ``SO(N)`` and watch the fatal terms shrink to zero.
+
+    ``frames`` is a sequence of ``(N, labels, values, fatal, verdict)``: the
+    twelve-form's coefficients in a fixed monomial order, a boolean per bar
+    saying whether that monomial is one no ``X_4 X_8`` product can reach, and
+    a short verdict string.
+
+    The two red bars are ``tr R^6`` and ``tr F^6``.  Nothing can absorb them,
+    so both have to vanish on their own -- and they do so at different values
+    of ``N``, for different reasons, meeting only at 32.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
+
+    frames = [
+        (int(n), list(labels), [float(v) for v in values], list(fatal), str(verdict))
+        for n, labels, values, fatal, verdict in frames
+    ]
+    labels = frames[0][1]
+    reach = max(max(abs(v) for v in values) for _, _, values, _, _ in frames)
+
+    fig, ax = plt.subplots(figsize=(8.6, 4.6), dpi=130)
+    fig.subplots_adjust(left=0.10, right=0.97, top=0.86, bottom=0.30)
+    positions = np.arange(len(labels))
+    bars = ax.bar(positions, np.zeros(len(labels)), color="#1f77b4")
+    ax.axhline(0.0, color="0.3", lw=1.0)
+    ax.set_xticks(positions)
+    ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=8)
+    ax.set_ylim(-1.15 * reach, 1.15 * reach)
+    ax.set_ylabel("twelve-form coefficient")
+    ax.grid(alpha=0.25, axis="y")
+
+    def draw(i: int):
+        n, _, values, fatal, verdict = frames[i]
+        for bar, value, bad in zip(bars, values, fatal, strict=True):
+            bar.set_height(value)
+            bar.set_color("#d62728" if bad and value != 0.0 else "#1f77b4")
+        clean = all(v == 0.0 for v, bad in zip(values, fatal, strict=True) if bad)
+        ax.set_title(
+            f"$SO({n})$ -- {verdict}", color="#2ca02c" if clean else "#d62728"
+        )
+        return bars
+
+    anim = FuncAnimation(fig, draw, frames=len(frames), blit=False)
     return _save_animation(anim, fig, path, fps)

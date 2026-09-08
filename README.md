@@ -25,7 +25,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 1003 checks
+python -m pytest                          # 1032 checks
 ```
 
 ---
@@ -772,6 +772,104 @@ dimensions. The lattice knows nothing about anomalies; two unrelated
 consistency conditions agreeing on 496 is why the construction was taken
 seriously.
 
+**The other 496** — `heterotic/anomaly.py`. The sentence above is the one every
+account makes and almost none computes. This one does.
+
+The ten-dimensional anomaly of a chiral field is the twelve-form part of an
+index density: `Â(R) ch(F)` for a spin-1/2 field, `Â(R)[tr e^R − 1]` for the
+gravitino, `−(1/8) L(R)` for a self-dual tensor. All three are power series in
+the symmetric functions of the curvature's skew eigenvalues, kept to twelve-form
+order in exact rationals.
+
+**The conventions are settled by a computation, not by memory.** Whether `L`
+carries a half-argument is exactly the sort of thing a remembered formula gets
+wrong, and type IIB decides it: two gravitini, two dilatini of the opposite
+chirality, one self-dual four-form, and the total must vanish. Three
+coefficients — `tr R^6`, `tr R^4 tr R^2`, `(tr R^2)^3` — with nothing to tune:
+
+```
+L = prod x/tanh x              residual 0
+L = prod (x/2)/tanh(x/2)       residual 31/23040
+```
+
+The second is the version that is easy to write down. It does not cancel. Only
+after that is the same machinery pointed at `N = 1`.
+
+**Then 496 falls out.** With one gravitino, one dilatino and gaugini in the
+adjoint of a group of dimension `n`, the coefficient of `tr R^6` is
+
+```
+(n - 496) / 725760
+```
+
+exactly. Nothing can cancel it — a pure-gravity term has no gauge field in it
+— so it must vanish on its own. The dependence on `n` is checked to be affine
+(second differences zero) and the root taken in rationals, giving **496**. The
+lattice reaches the same number by counting 16 Cartan directions and 480 roots
+and never mentions an anomaly.
+
+**The dimension is not the whole condition.** Killing `tr R^6` says how many
+gauge bosons there are, not which group. What is left must factorise as
+`X_4 X_8` so that a `B ∧ X_8` counterterm can cancel it — and no product of a
+four-form and an eight-form built from `tr R^2`, `tr F^2`, `tr R^4`, `tr F^4`
+contains a single `tr F^6`. For `SO(N)`,
+
+```
+Tr F^6 = (N - 32) tr F^6 + 15 tr F^2 tr F^4
+```
+
+so the dangerous term dies at `N = 32` and nowhere else:
+
+| `N` | `dim SO(N)` | coefficient of `tr F^6` |
+|---|---|---|
+| 30 | 435 | −1/720 |
+| 31 | 465 | −1/1440 |
+| **32** | **496** | **0** |
+| 33 | 528 | +1/1440 |
+
+`E_8` has no independent quartic or sextic Casimir at all — `Tr F^4 =
+(Tr F^2)^2/100`, `Tr F^6 = (Tr F^2)^3/7200` — so it passes for free, and two of
+them make 496.
+
+**Two conditions, from different halves of the anomaly, landing on the same
+group.** That they are genuinely separate is worth demonstrating rather than
+asserting, so the module does: `SO(26) x SO(19)` has dimension exactly 496,
+passes the gravitational condition exactly, and fails on `tr F^6` in both
+factors.
+
+**The factorisation, checked rather than assumed.** `X_4 = tr R^2 + b Tr F^2`
+with `b` read off a *single* coefficient — the one multiplying
+`Tr F^2 tr R^4` — after which every other coefficient is a prediction and the
+exactness of the polynomial division is what tests them. Both groups give the
+same `b`:
+
+```
+SO(32)    X_4 = trR^2 + trF^2
+          X_8 = trR^4/768 + (trR^2)^2/3072 + trF^4/96 + trR^2 trF^2/768
+          b = 1/30 in adjoint traces,  residual 0
+
+E8 x E8   X_4 = trR^2 + (trF_1^2 + trF_2^2)/30
+          b = 1/30 for each factor,    residual 0
+```
+
+`b = 1/30` is the textbook `tr R^2 − (1/30) Tr F^2`; the sign is a convention
+here, the `1/30` is not. A second and independent route agrees: `P = X_4 X_8`
+holds exactly when substituting `tr R^2 → −(X_4 − tr R^2)` annihilates `P`, and
+that never touches the division.
+
+**The scan.** 819 candidates — products of up to two factors drawn from
+`SO(N)`, `N ≤ 40`, and `E_8`. Two survive: `SO(32)` and `E_8 x E_8`.
+
+**What this is not.** A search over a family, not a uniqueness proof. `SU(N)`,
+`Sp(N)` and the smaller exceptional algebras have no trace identities here, and
+neither do the two further known solutions, `E_8 x U(1)^248` and `U(1)^496` —
+which cancel the anomaly and have no known string realisation.
+
+`figures/anomaly_conditions.png` puts the two zero crossings side by side,
+`figures/anomaly_scan.png` shows the whole family against the two things that
+must vanish, and `figures/anomaly_sweep.gif` sweeps `N` through `SO(N)` and
+watches the two terms nothing can absorb shrink to zero together.
+
 The full massless level is `504 x 16 = 8064` states: `128` of `N = 1`
 supergravity (the same graviton/`B`/dilaton/gravitino/dilatino reps as section
 6) plus `496 x 16 = 7936` gauge.
@@ -1373,6 +1471,9 @@ needed. `examples/` produces:
 | `fermion_reflection.gif` | the same pulse, moving -- and coming back upside down in NS |
 | `brane_separation.png` | levels rising as branes separate |
 | `veneziano.png` | the amplitude and its poles |
+| `anomaly_conditions.png` | the two conditions ten dimensions imposes, both crossing zero |
+| `anomaly_scan.png` | 819 candidate groups against the two that must vanish |
+| `anomaly_sweep.gif` | `SO(N)` swept: the terms nothing can absorb, shrinking to zero |
 | `central_charge.png` | `c` read off a commutator, against `c = D` |
 | `ghost_onset.png` | two bounds on `D`, pointing opposite ways, meeting at 26 |
 | `no_ghost_region.png` | the `(D, a)` plane, coloured by the smallest physical norm |
@@ -1405,6 +1506,7 @@ python examples/18_matrix_model.py            # D0-brane dynamics, strings, chao
 python examples/19_shifts.py                  # the shift that repairs T-duality
 python examples/20_non_abelian.py             # Delta(27), and what generalises
 python examples/21_virasoro_and_ghosts.py     # c from a commutator, D=26 from norms
+python examples/22_anomaly_cancellation.py    # 496 and the two groups, from the anomaly
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -1417,7 +1519,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-1003 checks, a couple of minutes. They are cross-checks rather than regression
+1032 checks, a couple of minutes. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
@@ -1462,7 +1564,14 @@ wrong, not merely if the code changed. A representative sample:
   boost of the momentum;
 * the level-2 physical spectrum is ghost-free exactly up to `D = 26` and meets
   the light-cone count exactly from `D = 26` up, so the two bounds intersect in
-  one dimension -- and level 3 gives the same edge.
+  one dimension -- and level 3 gives the same edge;
+* the type IIB anomaly cancels to *exactly zero* in rationals -- three
+  twelve-form coefficients at once -- while the half-argument Hirzebruch class
+  leaves `31/23040`, which is what fixes the convention;
+* the `A-hat` and `L` series agree with the products they came from, the error
+  falling by 256 for every halving, as a truncation after the twelve-form must;
+* the anomaly polynomial and the root lattice both give `dim G = 496` with no
+  shared constant, and of 819 candidate groups exactly two cancel.
 
 ---
 
@@ -1501,6 +1610,15 @@ wrong, not merely if the code changed. A representative sample:
   operators, which would exhibit the positive-norm basis directly instead of
   counting eigenvalue signs.
 
+* **Anomaly cancellation beyond one family.** The twelve-form is assembled
+  and solved, and the search covers products of `SO(N)` and `E_8`.  It is not a
+  uniqueness proof: `SU(N)`, `Sp(N)` and the smaller exceptional algebras have
+  no trace identities in the module, so they are never tested, and the two
+  abelian solutions -- `E_8 x U(1)^248` and `U(1)^496`, which cancel and have no
+  known string realisation -- are outside it too.  Nor is the Green-Schwarz
+  counterterm itself constructed; what is shown is that the twelve-form
+  factorises, which is the condition for one to exist.
+
 * **Higher genus, and amplitudes with insertions.** The one-loop vacuum diagram
   and its moduli space are computed; two loops, vertex operators on the torus,
   and the annulus with different branes at the two ends are not.
@@ -1533,6 +1651,10 @@ wrong, not merely if the code changed. A representative sample:
   ch. 4 — the even self-dual lattices and their classification.
 * R. C. Brower, *Spectrum-generating algebra and no-ghost theorem for the dual
   model*, Phys. Rev. D **6** (1972) 1655.
+* M. B. Green and J. H. Schwarz, *Anomaly cancellations in supersymmetric
+  D = 10 gauge theory and superstring theory*, Phys. Lett. B **149** (1984) 117.
+* L. Alvarez-Gaume and E. Witten, *Gravitational anomalies*, Nucl. Phys. B
+  **234** (1984) 269 -- the index densities used here.
 * P. Goddard and C. B. Thorn, *Compatibility of the dual Pomeron with unitarity
   and the absence of ghosts in the dual resonance model*, Phys. Lett. B **40**
   (1972) 235.
