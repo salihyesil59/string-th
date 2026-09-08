@@ -39,6 +39,7 @@ __all__ = [
     "animate_physical_norms",
     "animate_anomaly_sweep",
     "animate_worldsheet_parity",
+    "animate_narain_levels",
 ]
 
 
@@ -924,4 +925,81 @@ def animate_worldsheet_parity(panels, path, beads=(0.0, 0.25, 0.5, 0.75), fps: i
         return artists
 
     anim = FuncAnimation(fig, draw, frames=n_frames, blit=False)
+    return _save_animation(anim, fig, path, fps)
+
+
+def animate_narain_levels(frames, path, fps: int = 12):
+    r"""Sweep a radius and watch the charge levels slide past the self-dual point.
+
+    ``frames`` is a sequence of ``(radius, levels)`` where ``levels`` maps
+    ``(l_L^2/2, l_R^2/2)`` to a multiplicity.
+
+    Every charge moves along a line of constant ``h - h_bar = n.w``, because
+    that combination is moduli-independent.  What changes is where along the
+    line it sits.  At the self-dual radius four of them land exactly on the
+    axes -- squared length 2 on one side, zero on the other -- and those are the
+    gauge bosons of the enhanced symmetry.
+
+    Sweeping past it, the picture reflects in the diagonal: ``R -> 1/R``
+    exchanges the two axes, which is T-duality drawn rather than argued.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
+
+    frames = [(float(radius), dict(levels)) for radius, levels in frames]
+    reach = 3.0
+
+    fig, (plane, trace) = plt.subplots(
+        1, 2, figsize=(9.4, 4.4), dpi=130, gridspec_kw={"width_ratios": [1.0, 1.0]}
+    )
+    fig.subplots_adjust(left=0.08, right=0.97, top=0.88, bottom=0.13, wspace=0.3)
+
+    plane.axhline(0.0, color="0.75", lw=1.0)
+    plane.axvline(0.0, color="0.75", lw=1.0)
+    plane.plot([0, reach], [0, reach], color="0.85", lw=1.0, ls="--")
+    scatter = plane.scatter([], [], s=[], color="#1f77b4", alpha=0.75, zorder=3)
+    highlight = plane.scatter([], [], s=110, facecolors="none", edgecolors="#d62728",
+                              lw=1.8, zorder=4)
+    plane.set_xlim(-0.3, reach + 0.3)
+    plane.set_ylim(-0.3, reach + 0.3)
+    plane.set_aspect("equal")
+    plane.set_xlabel(r"$\ell_L^2 / 2$")
+    plane.set_ylabel(r"$\ell_R^2 / 2$")
+    plane.grid(alpha=0.25)
+
+    radii = np.array([r for r, _ in frames])
+    counts = np.array([
+        sum(m for (a, b), m in levels.items()
+            if (abs(a - 1) < 1e-9 and b < 1e-9) or (abs(b - 1) < 1e-9 and a < 1e-9))
+        for _, levels in frames
+    ], dtype=float)
+    trace.plot(radii, counts, "-", lw=1.4, color="#2ca02c")
+    (head,) = trace.plot([], [], "o", ms=9, color="#d62728")
+    trace.axvline(1.0, color="0.55", lw=1.0, ls=":")
+    trace.set_xscale("log")
+    trace.set_xlabel(r"radius $R / \sqrt{\alpha'}$")
+    trace.set_ylabel("massless gauge bosons")
+    trace.set_ylim(-0.4, max(counts.max(), 1.0) + 0.6)
+    trace.grid(alpha=0.25)
+    trace.set_title("only at the self-dual radius", fontsize=11)
+
+    def draw(i: int):
+        radius, levels = frames[i]
+        xs, ys, sizes, marked = [], [], [], []
+        for (a, b), count in levels.items():
+            if a > reach + 1e-9 or b > reach + 1e-9:
+                continue
+            xs.append(a)
+            ys.append(b)
+            sizes.append(20 + 30 * (count - 1))
+            if (abs(a - 1) < 1e-9 and b < 1e-9) or (abs(b - 1) < 1e-9 and a < 1e-9):
+                marked.append((a, b))
+        scatter.set_offsets(np.column_stack([xs, ys]) if xs else np.zeros((0, 2)))
+        scatter.set_sizes(sizes)
+        highlight.set_offsets(np.array(marked) if marked else np.zeros((0, 2)))
+        head.set_data([radius], [counts[i]])
+        plane.set_title(f"$R = {radius:.3f}$ -- {len(marked)} roots", fontsize=11)
+        return scatter, highlight, head
+
+    anim = FuncAnimation(fig, draw, frames=len(frames), blit=False)
     return _save_animation(anim, fig, path, fps)

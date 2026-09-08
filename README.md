@@ -25,7 +25,7 @@ is where those cross-checks live.
 ```
 python -m stringsim                       # summary of everything, in one screen
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 1063 checks
+python -m pytest                          # 1112 checks
 ```
 
 ---
@@ -1394,6 +1394,100 @@ of terms, not hundreds. With the default the invariance check reads `1e-3`
 instead of `1e-11`, and the tests assert that the gap closes when more terms are
 asked for.
 
+**The partition function, and what the lattice is for** — `amplitudes/narain.py`.
+Section 4 builds `Gamma_{d,d}` and reads a spectrum off it; section 9 integrates
+a modular-invariant density over the fundamental domain. Until now the two never
+met. The object that joins them is the lattice theta series
+
+```
+Theta(tau, taubar) = sum over (w, n) of q^(l_L^2 / 2) qbar^(l_R^2 / 2)
+```
+
+summed over exactly the charges that give the spectrum. It converges because
+`l_L^2 + l_R^2` — the generalized metric — is **positive definite**, even though
+`l_L^2 - l_R^2` is not. That is what makes it a finite computation rather than a
+formal one, and the truncation is reported alongside every number below
+(`3e-16` at the cutoff used, so nothing here is arithmetic).
+
+Of the `D - 2` transverse directions, `d` are compact and contribute the sum
+while the rest contribute momentum integrals:
+
+```
+I(tau) = tau_2^{-(D-2-d)/2} |eta(tau)|^{-2(D-2)} Theta(tau, taubar)
+```
+
+At `d = 0` the theta series is 1 and this **is** `oneloop.torus_integrand` —
+checked to `6e-16` rather than argued.
+
+**Even self-duality is asserted in a docstring elsewhere in this package. Here
+it is computed, and the two halves of it fail separately.**
+
+* `T: tau -> tau + 1` multiplies each term by `exp(2 pi i n.w)`, which is 1
+  because the lattice is **even**. Nothing else is used.
+* `S: tau -> -1/tau` resums the lattice against its dual, so it returns the same
+  series only because the lattice is **self-dual**.
+
+Restricting the momenta to multiples of `s` gives a sublattice of index `s^d`:
+still even, no longer self-dual.
+
+| lattice | `l_L^2 - l_R^2` even? | `T` residual | `S` residual |
+|---|---|---|---|
+| `Gamma_{2,2}` | 0 | `7e-15` | `2e-14` |
+| momenta in `2Z` | 0 | `7e-15` | **`1.2e-1`** |
+| momenta in `3Z` | 0 | `7e-15` | **`1.2e-1`** |
+| momenta in `4Z` | 0 | `7e-15` | **`1.2e-1`** |
+
+Twelve orders of magnitude, in one column and not the other.
+
+**And the failure saturates, which was not the guess.** It does not grow with
+the index: from `s = 3` on it is flat to six digits. Removing momentum modes
+only matters while they contribute, and at `tau_2 = 1.1` the lightest one
+already carries `exp(-4 pi tau_2) ~ 1e-6`. Lowering `tau_2` puts them back and
+raises the plateau — `0.45` at `tau_2 = 0.55`, `0.68` at `0.35`.
+
+**Where the invariance actually comes from.** The theta series is *not*
+invariant on its own; it carries weight. Under `S` it picks up exactly `|tau|^d`,
+and `|eta|^{2d}` picks up the same, so the ratio is what survives:
+
+```
+|tau|      |Theta(-1/tau) / Theta(tau)|      |tau|^d
+0.8246              0.6800000000          0.6800000000
+1.1402              1.3000000000          1.3000000000
+2.2361              5.0000000000          5.0000000000
+```
+
+Checking the *factor* rather than only the cancellation is what makes the
+cancellation a result.
+
+**T-duality, on the generating function.** `O(d,d;Z)` moves the moduli and the
+charges together, so two T-dual backgrounds have the same partition function —
+`5e-16` for a factorized duality, a `B`-shift and a basis change. Section 4's
+`spectrum_is_dual` had to follow states one by one through the charge map,
+because a truncated charge *box* is sheared by the duality and states leave it.
+Here the truncation is a ball in the invariant form `Z^T H Z`, so the same terms
+are summed on both sides and the comparison is direct.
+
+**Reading the spectrum back out.** Charges with `l_L^2 = 2`, `l_R^2 = 0` are the
+gauge bosons, and counting them in the theta expansion reproduces what
+`root_vectors` gets by *solving* the root condition instead of enumerating: 4 on
+the self-dual circle, 8 on the self-dual square torus, 0 at `R = 1.3` and 0 for
+a generic torus with a `B`-field.
+
+One honest wrinkle found on the way. `Theta` is real when `2 tau_1` is an
+integer — the only phase in a term is `exp(2 pi i tau_1 n.w)` — and with `B = 0`
+it is real everywhere, because `(n, w) -> (n, -w)` then flips `n.w` while
+preserving `l_L^2 + l_R^2`. With a `B`-field it is genuinely complex off those
+lines: an imaginary part `1.6e-8` of the real one, unmoved by raising the
+cutoff. What holds in every case is `Theta(-taubar) = conj Theta(tau)`, exactly,
+which is what makes the integral over the fundamental domain real even where the
+integrand is not.
+
+`figures/modular_invariance.png` puts the two conditions side by side,
+`figures/narain_levels.png` shows where the charges sit in the
+`(l_L^2/2, l_R^2/2)` plane, and `figures/narain_radius.gif` sweeps a circle's
+radius past the self-dual point and watches four charges land on the axes and
+leave again.
+
 ### 10. The Virasoro algebra, and `D = 26` from unitarity — `stringsim.quantum.virasoro`
 
 Everything above *counts* states. This section *builds* them, and uses them to
@@ -1572,6 +1666,9 @@ needed. `examples/` produces:
 | `fermion_reflection.gif` | the same pulse, moving -- and coming back upside down in NS |
 | `brane_separation.png` | levels rising as branes separate |
 | `veneziano.png` | the amplitude and its poles |
+| `modular_invariance.png` | the two conditions on the lattice, failing separately |
+| `narain_levels.png` | where the charges sit, and which of them are roots |
+| `narain_radius.gif` | a circle's radius swept past the self-dual point |
 | `orientifold_spectrum.png` | what parity removes, and the spectrum it leaves twice over |
 | `worldsheet_surfaces.png` | the four one-loop surfaces as identification diagrams |
 | `worldsheet_parity.gif` | a string, its parity image, and the folded invariant |
@@ -1612,6 +1709,7 @@ python examples/20_non_abelian.py             # Delta(27), and what generalises
 python examples/21_virasoro_and_ghosts.py     # c from a commutator, D=26 from norms
 python examples/22_anomaly_cancellation.py    # 496 and the two groups, from the anomaly
 python examples/23_type_i_orientifold.py      # type I: parity, D9-branes, SO(32) again
+python examples/24_narain_partition.py        # modular invariance, and what the lattice is for
 ```
 
 Each prints its numbers and writes its figures into `figures/`.
@@ -1624,7 +1722,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-1063 checks, a couple of minutes. They are cross-checks rather than regression
+1112 checks, a couple of minutes. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 
@@ -1684,7 +1782,15 @@ wrong, not merely if the code changed. A representative sample:
   8064 states split 128 and 7936, from constructions that share no step;
 * swapping a closed string's two chiralities equals reflecting `sigma`, exactly,
   and the invariant combination's `|X(sigma) - X(-sigma)|` is round-off while a
-  travelling one's is of order its own size.
+  travelling one's is of order its own size;
+* the Narain partition function is invariant under both `T` and `S`, and under a
+  sublattice -- still even, no longer self-dual -- only under `T`, by twelve
+  orders of magnitude;
+* the theta series alone picks up exactly `|tau|^d` under `S`, matching to ten
+  digits, which is the factor that cancels against `|eta|^{2d}`;
+* with no compact directions the compactified integrand equals the one
+  `oneloop.py` already had, and the roots read off the theta expansion equal the
+  ones `root_vectors` solves for.
 
 ---
 
