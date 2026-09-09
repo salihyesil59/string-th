@@ -40,6 +40,7 @@ from stringsim.gui.panel import (  # noqa: E402
     notes_of,
     suggestions_of,
 )
+from stringsim.gui.panels.anomaly import AnomalyPanel  # noqa: E402
 from stringsim.gui.panels.bion import BIonPanel  # noqa: E402
 from stringsim.gui.panels.branes import BranePanel  # noqa: E402
 from stringsim.gui.panels.critical import CriticalDimensionPanel  # noqa: E402
@@ -1243,3 +1244,113 @@ def test_every_bion_check_agrees_across_the_controls() -> None:
                     BION.compute(n_strings=n_strings, p=p, slope=slope)
                 )
                 assert all(line.ok for line in lines if line.is_check), (p, n_strings, slope)
+
+
+# --------------------------------------------------------------------------
+# anomaly cancellation
+# --------------------------------------------------------------------------
+
+ANOMALY = AnomalyPanel()
+
+
+def test_only_two_groups_survive_the_scan() -> None:
+    """819 candidates, three conditions, and the two heterotic strings left.
+
+    They were not looked for: the scan builds a family and reports what comes
+    through it.
+    """
+    result = ANOMALY.compute()
+    assert result.total == 819
+    assert set(result.survivors) == {"SO(32)", "E8 x E8"}
+    assert result.found_both
+
+
+def test_four_hundred_and_ninety_six_from_two_unrelated_places() -> None:
+    r"""A twelve-form's ``tr R^6`` coefficient, and a count of short lattice vectors.
+
+    One solves for the gauge dimension that kills a pure-gravity term; the
+    other counts the 480 roots of an even self-dual rank-16 lattice and adds
+    the 16 Cartan directions.
+    """
+    result = ANOMALY.compute()
+    assert result.dimension_from_anomaly == 496
+    assert result.lattice_dimension == 496
+    assert result.dimensions_agree
+    assert {roots for _, roots, _ in result.lattice_dimensions} == {480}
+    assert len(result.lattice_dimensions) == 2
+
+
+def test_passing_the_gravitational_condition_is_not_passing() -> None:
+    r"""``SO(26) x SO(19)`` has dimension 496 and still leaves a ``tr F^6``.
+
+    More candidates reach 496 than survive, which is the whole point of the
+    picture: the two conditions are separate.
+    """
+    result = ANOMALY.compute()
+    assert result.right_dimension > len(result.survivors)
+    assert result.right_dimension == 3
+
+
+def test_the_factorisation_coefficient_comes_out_rather_than_going_in() -> None:
+    r"""``X_4 = tr R^2 + b Tr F^2`` with ``b = 1/30``, for every surviving factor."""
+    result = ANOMALY.compute()
+    assert result.coefficients
+    assert {value for _, value in result.coefficients} == {"1/30"}
+    assert len(result.coefficients) == 3  # one for SO(32), two for E8 x E8
+
+
+@pytest.mark.parametrize(
+    ("max_so", "max_factors", "expected", "unreachable"),
+    [
+        (30, 2, {"E8 x E8"}, ("SO(32)",)),
+        (40, 1, {"SO(32)"}, ("E8 x E8",)),
+        (30, 1, set(), ("SO(32)", "E8 x E8")),
+    ],
+)
+def test_a_window_that_cannot_hold_them_makes_no_claim(
+    max_so, max_factors, expected, unreachable
+) -> None:
+    """Narrowing the search is not the scan disagreeing with anything.
+
+    ``SO(32)`` needs the scan to reach ``N = 32`` and ``E_8 x E_8`` needs two
+    factors.  Outside that the survivors line drops its verdict and names what
+    is out of reach, rather than reporting a failure of ten dimensions.
+    """
+    result = ANOMALY.compute(max_so=max_so, max_factors=max_factors)
+    assert set(result.survivors) == expected
+    assert not result.window_holds_both
+    assert result.out_of_reach == unreachable
+
+    line = next(item for item in ANOMALY.readout(result) if item.label == "survivors")
+    assert not line.is_check
+    assert "cannot be reached by this window" in line.check
+    assert "told to look" in " ".join(ANOMALY.notes(result))
+
+
+def test_a_window_that_can_hold_them_does_make_a_claim() -> None:
+    result = ANOMALY.compute(max_so=32, max_factors=2)
+    assert result.window_holds_both
+    assert result.out_of_reach == ()
+    line = next(item for item in ANOMALY.readout(result) if item.label == "survivors")
+    assert line.ok is True
+
+
+def test_widening_the_scan_finds_nothing_further() -> None:
+    """More candidates, the same two survivors -- which is the interesting part."""
+    narrow = ANOMALY.compute(max_so=32)
+    wide = ANOMALY.compute(max_so=48)
+    assert wide.total > narrow.total
+    assert set(wide.survivors) == set(narrow.survivors) == {"SO(32)", "E8 x E8"}
+
+
+def test_the_panel_says_it_is_not_a_uniqueness_proof() -> None:
+    """A finite search over one family, and the readout does not let it pass for more."""
+    result = ANOMALY.compute()
+    line = next(
+        item for item in ANOMALY.readout(result) if item.label == "what this is not"
+    )
+    assert "uniqueness proof" in line.value
+    assert "SU(N)" in line.check
+    assert "uniqueness proof" in " ".join(
+        background_of(ANOMALY)
+    )
