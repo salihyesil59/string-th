@@ -1,8 +1,10 @@
 """Static figures for each part of the package.
 
 Every function takes an output path and returns it, so an example script reads
-as a list of files produced.  Nothing here computes physics -- it only draws
-what the other modules return, which keeps the figures honest.
+as a list of files produced.  Passing ``path=None`` instead returns the figure
+itself, which is how :mod:`stringsim.gui` puts these same figures on a live
+canvas without a second drawing layer.  Nothing here computes physics -- it
+only draws what the other modules return, which keeps the figures honest.
 
 The backend is left to matplotlib; scripts that run headless should select
 ``Agg`` before importing pyplot.
@@ -12,8 +14,16 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
+
+if TYPE_CHECKING:  # pragma: no cover - annotations only
+    from matplotlib.figure import Figure
+
+    #: What a ``plot_*`` returns: the file it wrote, or the figure itself when
+    #: no path was given.
+    Drawn = Path | Figure
 
 __all__ = [
     "plot_mass_spectrum",
@@ -82,18 +92,31 @@ def _fig(nrows: int = 1, ncols: int = 1, **kw):
         return plt.subplots(nrows, ncols, **kw)
 
 
-def _save(fig, path) -> Path:
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
+def _save(fig, path) -> Drawn:
+    """Write the figure to ``path``, or hand it back when ``path`` is ``None``.
+
+    Every ``plot_*`` function ends here, which is why one branch is enough to
+    make all of them available to a live canvas: :mod:`stringsim.gui` draws the
+    same figures the example scripts write, and no signature changed to allow
+    it.
+
+    In both branches the figure leaves pyplot's registry.  A script that writes
+    fifty files and a window that redraws fifty times would otherwise both
+    accumulate fifty open figures.  Closing does not destroy the figure -- it
+    detaches it, and the caller is then free to give it a canvas of its own.
+    """
     fig.tight_layout()
-    fig.savefig(path)
+    if path is not None:
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(path)
     import matplotlib.pyplot as plt
 
     plt.close(fig)
-    return path
+    return fig if path is None else path
 
 
-def plot_mass_spectrum(levels, path, title: str = "Open bosonic string spectrum") -> Path:
+def plot_mass_spectrum(levels, path, title: str = "Open bosonic string spectrum") -> Drawn:
     """Mass levels as a ladder, with the number of states at each rung.
 
     ``levels`` is a list of :class:`~stringsim.quantum.spectrum.Level`.
@@ -118,7 +141,7 @@ def plot_mass_spectrum(levels, path, title: str = "Open bosonic string spectrum"
     return _save(fig, path)
 
 
-def plot_regge_trajectory(points, path, title: str = "Leading Regge trajectory") -> Path:
+def plot_regge_trajectory(points, path, title: str = "Leading Regge trajectory") -> Drawn:
     """``J`` against ``alpha' M^2`` for the classical rotating string."""
     fig, ax = _fig()
     x = np.array([p.alpha_m2 for p in points])
@@ -133,7 +156,7 @@ def plot_regge_trajectory(points, path, title: str = "Leading Regge trajectory")
     return _save(fig, path)
 
 
-def plot_degeneracy_growth(fit, degeneracies, path) -> Path:
+def plot_degeneracy_growth(fit, degeneracies, path) -> Drawn:
     r"""The exponential growth of the density of states, and its slope.
 
     Left: ``log d_N`` against ``sqrt(N)`` with the *complete* fitted model
@@ -198,7 +221,7 @@ def plot_degeneracy_growth(fit, degeneracies, path) -> Path:
     return _save(fig, path)
 
 
-def plot_tduality(radii, kk, winding, self_dual: float, path) -> Path:
+def plot_tduality(radii, kk, winding, self_dual: float, path) -> Drawn:
     """Kaluza-Klein and winding towers crossing at the self-dual radius."""
     fig, ax = _fig()
     ax.loglog(radii, kk, label=r"Kaluza-Klein $n/R$", color="tab:blue")
@@ -211,7 +234,7 @@ def plot_tduality(radii, kk, winding, self_dual: float, path) -> Path:
     return _save(fig, path)
 
 
-def plot_brane_separation(separations, levels_by_sep, path) -> Path:
+def plot_brane_separation(separations, levels_by_sep, path) -> Drawn:
     """``M^2`` of stretched-string levels as two D-branes are pulled apart."""
     fig, ax = _fig()
     n_levels = len(levels_by_sep[0])
@@ -229,7 +252,7 @@ def plot_brane_separation(separations, levels_by_sep, path) -> Path:
     return _save(fig, path)
 
 
-def plot_veneziano(s_values, amplitude, poles, path, clip: float = 25.0) -> Path:
+def plot_veneziano(s_values, amplitude, poles, path, clip: float = 25.0) -> Drawn:
     """The Veneziano amplitude along the real ``s`` axis, poles marked.
 
     Values beyond ``clip`` are masked rather than drawn, so each branch is a
@@ -250,7 +273,7 @@ def plot_veneziano(s_values, amplitude, poles, path, clip: float = 25.0) -> Path
     return _save(fig, path)
 
 
-def plot_mode_spectrum(coefficients, path, title: str = "Normal-mode content") -> Path:
+def plot_mode_spectrum(coefficients, path, title: str = "Normal-mode content") -> Drawn:
     """Bar chart of a snapshot's Fourier coefficients."""
     fig, ax = _fig()
     amp = np.abs(np.asarray(coefficients))
@@ -263,7 +286,7 @@ def plot_mode_spectrum(coefficients, path, title: str = "Normal-mode content") -
     return _save(fig, path)
 
 
-def plot_root_system(roots, path, title: str = "Root system", label: str = "") -> Path:
+def plot_root_system(roots, path, title: str = "Root system", label: str = "") -> Drawn:
     r"""Draw a two-dimensional root system as arrows from the origin.
 
     ``roots`` is an ``(n, 2)`` array of ``l_L`` (or ``l_R``) vectors from
@@ -301,7 +324,7 @@ def plot_root_system(roots, path, title: str = "Root system", label: str = "") -
     return _save(fig, path)
 
 
-def plot_enhancement_map(g_values, b_values, root_counts, path) -> Path:
+def plot_enhancement_map(g_values, b_values, root_counts, path) -> Drawn:
     r"""Where in the ``T^2`` moduli space the gauge symmetry grows.
 
     ``root_counts`` is a 2-D array indexed ``[g, b]`` over the off-diagonal
@@ -336,7 +359,7 @@ def plot_enhancement_map(g_values, b_values, root_counts, path) -> Path:
     return _save(fig, path)
 
 
-def plot_fixed_points(orbifold, path, sectors=(1,), title: str | None = None) -> Path:
+def plot_fixed_points(orbifold, path, sectors=(1,), title: str | None = None) -> Drawn:
     r"""Fixed points of a two-dimensional orbifold, drawn in the torus cell.
 
     The parallelogram is the fundamental cell of the lattice, obtained from a
@@ -372,7 +395,7 @@ def plot_fixed_points(orbifold, path, sectors=(1,), title: str | None = None) ->
     return _save(fig, path)
 
 
-def plot_supersymmetry(levels, bosonic_degeneracies, super_degeneracies, path) -> Path:
+def plot_supersymmetry(levels, bosonic_degeneracies, super_degeneracies, path) -> Drawn:
     r"""Boson and fermion counts level by level, and how fast each theory grows.
 
     Left: the GSO-projected superstring's bosons and fermions as paired bars,
@@ -450,7 +473,7 @@ def plot_supersymmetry(levels, bosonic_degeneracies, super_degeneracies, path) -
     return _save(fig, path)
 
 
-def plot_root_connectivity(named_roots, path, title: str | None = None) -> Path:
+def plot_root_connectivity(named_roots, path, title: str | None = None) -> Drawn:
     r"""Which roots are non-orthogonal to which -- the thing that separates the algebras.
 
     ``named_roots`` is a sequence of ``(label, roots)`` pairs.  Each panel shows
@@ -486,7 +509,7 @@ def plot_root_connectivity(named_roots, path, title: str | None = None) -> Path:
     return _save(fig, path)
 
 
-def plot_fermion_reflection(panels, path, title: str | None = None) -> Path:
+def plot_fermion_reflection(panels, path, title: str | None = None) -> Drawn:
     r"""Worldsheet history of ``psi_-``, where the sector is visible as a colour.
 
     ``panels`` is a sequence of ``(label, evolution)`` pairs of open-string
@@ -529,7 +552,7 @@ def plot_fermion_reflection(panels, path, title: str | None = None) -> Path:
     return _save(fig, path)
 
 
-def plot_wilson_enhancement(points, path, generic_count=None, title=None) -> Path:
+def plot_wilson_enhancement(points, path, generic_count=None, title=None) -> Drawn:
     """Where in the (Wilson line, radius) plane the gauge group grows.
 
     ``points`` is a sequence of ``(a, G, n_roots)``: a one-parameter family of
@@ -560,7 +583,7 @@ def plot_wilson_enhancement(points, path, generic_count=None, title=None) -> Pat
     return _save(fig, path)
 
 
-def plot_twist_classification(rows, path, title: str | None = None) -> Path:
+def plot_twist_classification(rows, path, title: str | None = None) -> Drawn:
     """How the automorphisms of each background split, as fractions of the group.
 
     ``rows`` is a sequence of ``(label, geometric, asymmetric_failing,
@@ -617,7 +640,7 @@ def plot_twist_classification(rows, path, title: str | None = None) -> Path:
     return _save(fig, path)
 
 
-def plot_dbi_field(charges, dbi_energy, maxwell_energy, field_ratio, path, title=None) -> Path:
+def plot_dbi_field(charges, dbi_energy, maxwell_energy, field_ratio, path, title=None) -> Drawn:
     r"""What Born-Infeld does that Maxwell does not, in the variable that shows it.
 
     ``charges`` is the dimensionless displacement ``D``; ``dbi_energy`` and
@@ -657,7 +680,7 @@ def plot_dbi_field(charges, dbi_energy, maxwell_energy, field_ratio, path, title
 def plot_bion_spike(
     profiles, path, extent: float = 1.0, n_grid: int = 120,
     height: float | None = None, title=None,
-) -> Path:
+) -> Drawn:
     r"""The brane's shape where strings end on it, one panel per string number.
 
     ``profiles`` is a sequence of ``(label, radial_function)``.  Each panel is a
@@ -709,7 +732,7 @@ def plot_bion_spike(
     return _save(fig, path)
 
 
-def plot_fundamental_domain(images, path, points=(), links=(), title: str | None = None) -> Path:
+def plot_fundamental_domain(images, path, points=(), links=(), title: str | None = None) -> Drawn:
     r"""The fundamental domain of ``SL(2,Z)`` and its images tiling the plane.
 
     ``images`` is a sequence of arrays of complex numbers, each the boundary of
@@ -774,7 +797,7 @@ def plot_fundamental_domain(images, path, points=(), links=(), title: str | None
     return _save(fig, path)
 
 
-def plot_one_loop_integrand(heights, values, fitted, path, title: str | None = None) -> Path:
+def plot_one_loop_integrand(heights, values, fitted, path, title: str | None = None) -> Drawn:
     r"""The torus integrand along the imaginary axis, and what its growth means.
 
     ``heights`` are values of ``tau_2``, ``values`` the integrand there and
@@ -813,7 +836,7 @@ def _decade_ticks(ax, values) -> None:
     ax.xaxis.set_minor_formatter(NullFormatter())
 
 
-def plot_channel_duality(moduli, open_channel, closed_channel, path, title=None) -> Path:
+def plot_channel_duality(moduli, open_channel, closed_channel, path, title=None) -> Drawn:
     """One diagram in two languages: an open loop and a closed exchange.
 
     ``moduli`` are values of the open-string modulus ``t``; ``open_channel`` is
@@ -853,7 +876,7 @@ def _sphere_scale(heights, radii) -> float:
     return reach if reach > 0.0 else 1.0
 
 
-def plot_fuzzy_sphere(entries, path, title: str | None = None) -> Path:
+def plot_fuzzy_sphere(entries, path, title: str | None = None) -> Drawn:
     r"""A fuzzy sphere is a stack of circles, and only that.
 
     ``entries`` is a sequence of ``(label, heights, radii)``, one per panel:
@@ -910,7 +933,7 @@ def plot_fuzzy_sphere(entries, path, title: str | None = None) -> Path:
     return _save(fig, path)
 
 
-def plot_myers_landscape(configurations, path, title: str | None = None) -> Path:
+def plot_myers_landscape(configurations, path, title: str | None = None) -> Drawn:
     """Every way of splitting N branes into blocks, and what each costs.
 
     ``configurations`` is a sequence of
@@ -944,7 +967,7 @@ def plot_myers_landscape(configurations, path, title: str | None = None) -> Path
     return _save(fig, path)
 
 
-def plot_hodge_diamond(entries, path, title: str | None = None) -> Path:
+def plot_hodge_diamond(entries, path, title: str | None = None) -> Drawn:
     r"""Hodge diamonds side by side, one per panel.
 
     ``entries`` is a sequence of ``(label, diamond)`` where ``diamond`` maps
@@ -989,7 +1012,7 @@ def plot_hodge_diamond(entries, path, title: str | None = None) -> Path:
     return _save(fig, path)
 
 
-def plot_fixed_loci(entries, path, title: str | None = None) -> Path:
+def plot_fixed_loci(entries, path, title: str | None = None) -> Drawn:
     """What each group element holds still, and how much of it there is.
 
     ``entries`` is a sequence of ``(label, [(element, components, dimension)])``.
@@ -1027,7 +1050,7 @@ def plot_fixed_loci(entries, path, title: str | None = None) -> Path:
     return _save(fig, path)
 
 
-def plot_matrix_worldlines(times, eigenvalues, path, title: str | None = None) -> Path:
+def plot_matrix_worldlines(times, eigenvalues, path, title: str | None = None) -> Drawn:
     """Where the branes are, as the eigenvalues of one matrix through time.
 
     ``eigenvalues`` has shape ``(n_frames, n_branes)``, from
@@ -1052,7 +1075,7 @@ def plot_matrix_worldlines(times, eigenvalues, path, title: str | None = None) -
     return _save(fig, path)
 
 
-def plot_lyapunov(fit, energies, exponents, power, path, title: str | None = None) -> Path:
+def plot_lyapunov(fit, energies, exponents, power, path, title: str | None = None) -> Drawn:
     r"""Exponential separation, and the power of the energy it scales with.
 
     ``fit`` is a :class:`stringsim.branes.matrixmodel.LyapunovFit`; ``energies``
@@ -1091,7 +1114,7 @@ def plot_lyapunov(fit, energies, exponents, power, path, title: str | None = Non
 
 def plot_shift_landscape(
     first, second, mismatch, marked, path, title: str | None = None
-) -> Path:
+) -> Drawn:
     r"""The ground-state mismatch over the square of shifts, and what closes it.
 
     ``first`` and ``second`` are the two components of the shift on ``[0, 1)``,
@@ -1128,7 +1151,7 @@ def plot_shift_landscape(
     return _save(fig, path)
 
 
-def plot_commutation(panels, path, title: str | None = None) -> Path:
+def plot_commutation(panels, path, title: str | None = None) -> Drawn:
     """Which pairs of a group commute, as a matrix of filled cells.
 
     ``panels`` is a sequence of ``(label, size, pairs)`` where ``pairs`` lists
@@ -1159,7 +1182,7 @@ def plot_commutation(panels, path, title: str | None = None) -> Path:
 
 def plot_central_charge(
     dims, measured, path, title: str = "Central charge from the algebra"
-) -> Path:
+) -> Drawn:
     r"""Measured ``c`` against the line ``c = D``.
 
     ``measured`` is a mapping ``{m: [c for each dim]}``, one series per
@@ -1209,7 +1232,7 @@ def plot_central_charge(
 
 def plot_ghost_onset(
     records, lightcone_counts, path, title: str = "The critical dimension from unitarity"
-) -> Path:
+) -> Drawn:
     r"""Two bounds on ``D``, pointing opposite ways, meeting at 26.
 
     ``records`` is a sequence of
@@ -1266,7 +1289,7 @@ def plot_ghost_onset(
 
 def plot_no_ghost_region(
     dims, intercepts, grid, path, boundary=None, title: str = "Where the ghosts are"
-) -> Path:
+) -> Drawn:
     r"""The ``(D, a)`` plane, coloured by the smallest physical norm.
 
     ``grid`` is what :func:`~stringsim.quantum.virasoro.no_ghost_map` returns:

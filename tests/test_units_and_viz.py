@@ -252,3 +252,66 @@ def test_the_new_visuals_reject_empty_input(tmp_path):
             maker([], tmp_path / "empty.png")
     with pytest.raises(ValueError, match="strictly in"):
         animate_twisted_string(0.0, tmp_path / "bad.gif")
+
+
+# --------------------------------------------------------------------------
+# path=None: the seam the window draws through
+# --------------------------------------------------------------------------
+
+
+def test_a_plot_with_no_path_hands_back_the_figure(tmp_path):
+    """The same call that writes a file returns the figure when asked for none.
+
+    This is the whole of what the GUI needed from ``viz``: one branch in the
+    helper every ``plot_*`` already ended with, so a window and a script draw
+    the same picture from the same code.
+    """
+    from matplotlib.figure import Figure
+
+    radii = np.geomspace(0.2, 5.0, 50)
+    figure = plot_tduality(radii, 1 / radii, radii, self_dual_radius(CONV), path=None)
+
+    assert isinstance(figure, Figure)
+    assert len(figure.axes) == 1
+    assert len(figure.axes[0].lines) == 3
+    assert not list(tmp_path.iterdir())
+
+
+def test_the_returned_figure_has_left_pyplot(tmp_path):
+    """Neither branch leaves an open figure behind.
+
+    A script that writes fifty files and a window that redraws fifty times
+    would otherwise both accumulate fifty of them.  Closing detaches the figure
+    without destroying it, so the caller can still give it a canvas -- which is
+    exactly what the window does.
+    """
+    import io
+
+    import matplotlib.pyplot as plt
+
+    before = plt.get_fignums()
+    figure = plot_mode_spectrum(np.arange(8.0), path=None)
+    assert plt.get_fignums() == before
+
+    buffer = io.BytesIO()
+    figure.savefig(buffer)
+    assert buffer.getvalue()
+
+    assert plot_mode_spectrum(np.arange(8.0), tmp_path / "modes.png").exists()
+    assert plt.get_fignums() == before
+
+
+def test_the_seam_is_general_rather_than_special_cased():
+    """Three unrelated plot functions, none of which knows about the window."""
+    from matplotlib.figure import Figure
+
+    levels = open_bosonic_spectrum(4, CONV)
+    seps = np.linspace(0.0, 5.0, 8)
+    made = [
+        plot_mass_spectrum(levels, path=None),
+        plot_regge_trajectory(regge_trajectory(conventions=CONV), path=None),
+        plot_brane_separation(
+            seps, [stretched_spectrum(d, 2, CONV) for d in seps], path=None
+        ),
+    ]
+    assert all(isinstance(figure, Figure) for figure in made)
