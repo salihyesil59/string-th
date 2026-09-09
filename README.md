@@ -26,7 +26,7 @@ is where those cross-checks live.
 python -m stringsim                       # summary of everything, in one screen
 python -m stringsim --gui                 # the same, with the parameters live
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 1451 checks
+python -m pytest                          # 1474 checks
 ```
 
 ---
@@ -2156,6 +2156,7 @@ the package already had and which decides the question its own way.
 | `D = 26`, from two sides | the intercept `a`, the level | a Gram signature, a state count, and `c = D - 26` |
 | The Hagedorn temperature | levels counted, species `c` | counted partitions vs Cardy's `2 pi sqrt(c/6)` |
 | T-duality on a circle | `R`, and the truncations | the sorted spectra subtracted, vs `spectrum_is_t_dual` |
+| Orbifold fixed points | the quotient, the sector | `|det(1 - theta^k)|` vs an enumeration; `a_k` in closed form vs a measured `zeta(-1, phi)` |
 | D-branes pulled apart | the separation, the stack | `sum n_i^2` vs a walk over ordered pairs; `2 pi sqrt(alpha')` vs a bisection |
 | The Myers effect | `N`, the background flux | a matrix minimum vs a wrapped D2; `Tr J^2` vs `1 - 1/N^2` |
 | `(p,q)` strings | `g_s`, `C_0`, the charges | ten dimensions vs eleven; `SL(2,Z)` on the tension; a junction's net force |
@@ -2264,7 +2265,7 @@ def readout(self, result) -> list[Line]  # the numbers, and the checks on them
 
 `Control` is a dataclass, so `app.py` builds the widgets and no panel imports
 tkinter. That is what lets the physics be tested the way everything else here is
-tested — 142 of this module's 148 tests need no display at all, and one of them
+tested — 165 of this module's 171 tests need no display at all, and one of them
 blocks the `tkinter` import outright and checks that the panels still load. The
 remaining six build a window, walk the registry, and let each panel compute,
 draw and report; they skip where there is no display, and none of them asserts
@@ -2284,7 +2285,7 @@ adding a sixth box to a legend already sitting on the curves.
 
 #### What is not there yet
 
-Eight panels of a possible fifteen or so. The registry is a tuple and the app
+Nine panels of a possible fifteen or so. The registry is a tuple and the app
 reads everything off it, so adding one is a module and a line — but which of the
 29 examples make good panels is a decision per example, and the ones that print
 a table are better as scripts. The animations are not in it either: the
@@ -2338,7 +2339,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-1451 checks.  Two minutes on a quiet machine and six on a busy one -- the
+1474 checks.  Two minutes on a quiet machine and six on a busy one -- the
 same suite has been timed at both, so the number is not quoted. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
