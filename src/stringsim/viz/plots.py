@@ -70,6 +70,7 @@ __all__ = [
     "plot_pq_strings",
     "plot_mirror_hodge",
     "plot_reflexive_duality",
+    "plot_check_summary",
 ]
 
 FUNDAMENTAL_DOMAIN_FLOOR = math.sqrt(3.0) / 2.0
@@ -2066,4 +2067,74 @@ def plot_reflexive_duality(panels, path, title: str = "A polytope and its dual")
             ax.set_title(f"{name}   ({len(points)} points)", fontsize=10)
 
     fig.suptitle(title, y=1.0)
+    return _save(fig, path)
+
+
+def plot_check_summary(rows, path, title: str = "Every check, at once") -> Drawn:
+    r"""Which independent comparisons agree, and which do not, in one picture.
+
+    ``rows`` is a sequence of ``(name, [(label, verdict), ...])`` where each
+    verdict is ``True`` for agreement, ``False`` for disagreement and ``None``
+    for a comparison that does not apply at these settings.  One dot per check,
+    one row per subject.
+
+    The three states are drawn differently on purpose.  A hollow ring is not a
+    pale red: it says the comparison was not made, which is a different claim
+    from its having been made and failed.
+    """
+    # Normalised rather than trusted: a ``numpy.bool_`` verdict is neither
+    # ``True`` nor ``False`` by identity, and would be drawn as a failure.
+    rows = [
+        (str(name), [(label, None if v is None else bool(v)) for label, v in checks])
+        for name, checks in rows
+    ]
+    if not rows:
+        raise ValueError("give at least one row of checks")
+
+    widest = max(len(checks) for _, checks in rows)
+    fig, ax = _fig(figsize=(max(6.6, 0.55 * widest + 4.2), 0.42 * len(rows) + 1.8))
+
+    for index, (_name, checks) in enumerate(rows):
+        y = len(rows) - 1 - index
+        ax.axhline(y, color="0.92", lw=8, zorder=0)
+        for column, (_, verdict) in enumerate(checks):
+            if verdict is None:
+                ax.plot([column], [y], "o", ms=8, mfc="none", mec="0.55", mew=1.4, zorder=2)
+            else:
+                ax.plot(
+                    [column], [y], "o", ms=8, zorder=2,
+                    color="#1a7f37" if verdict else "#b3261e",
+                )
+        agreed = sum(1 for _, verdict in checks if verdict is True)
+        made = sum(1 for _, verdict in checks if verdict is not None)
+        ax.annotate(
+            f"{agreed}/{made}",
+            xy=(widest - 0.4, y),
+            xytext=(14, 0),
+            textcoords="offset points",
+            va="center",
+            fontsize=9,
+            color="0.35",
+        )
+
+    ax.set_yticks(range(len(rows)))
+    ax.set_yticklabels([name for name, _ in reversed(rows)], fontsize=9)
+    ax.set_xticks(range(widest))
+    ax.set_xticklabels([str(n + 1) for n in range(widest)], fontsize=8)
+    ax.set_xlabel("check")
+    ax.set_xlim(-0.6, widest + 0.9)
+    ax.set_ylim(-0.7, len(rows) - 0.3)
+    ax.grid(False)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    total = sum(1 for _, checks in rows for _, v in checks if v is not None)
+    failed = sum(1 for _, checks in rows for _, v in checks if v is False)
+    skipped = sum(1 for _, checks in rows for _, v in checks if v is None)
+    ax.set_title(
+        f"{title} -- {total - failed} of {total} agree"
+        + (f", {failed} do not" if failed else "")
+        + (f", {skipped} not applicable" if skipped else ""),
+        fontsize=10,
+    )
     return _save(fig, path)

@@ -154,6 +154,7 @@ class App:
 
         self._readout.tag_configure("ok", foreground="#1a7f37")
         self._readout.tag_configure("bad", foreground="#b3261e")
+        self._readout.tag_configure("skip", foreground="#7a6a2f")
         self._readout.tag_configure("label", foreground="#555555")
         self._readout.configure(state="disabled")
 
@@ -221,10 +222,14 @@ class App:
         self._write_notes(panel, result)
         failed = sum(1 for line in lines if line.ok is False)
         checks = sum(1 for line in lines if line.is_check)
+        declined = sum(1 for line in lines if line.is_declined)
         self._status.configure(
-            text=f"{checks} independent check(s), {failed} failing"
-            if failed
-            else f"{checks} independent check(s), all agreeing"
+            text=(
+                f"{checks} independent check(s), {failed} failing"
+                if failed
+                else f"{checks} independent check(s), all agreeing"
+            )
+            + (f"; {declined} not applicable here" if declined else "")
         )
 
     def _show_figure(self, figure: Any) -> None:
@@ -252,6 +257,10 @@ class App:
                 self._readout.insert("end", f"   [{line.check}]")
             if line.is_check:
                 self._readout.insert("end", f"  {line.verdict()}", "ok" if line.ok else "bad")
+            elif line.is_declined:
+                # Not a pale red.  "No verdict here" is a different claim from
+                # "the two routes disagree", and the margin says which.
+                self._readout.insert("end", f"  {line.verdict()}", "skip")
             self._readout.insert("end", "\n")
         self._readout.configure(state="disabled")
 

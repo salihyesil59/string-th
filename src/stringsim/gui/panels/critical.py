@@ -223,6 +223,7 @@ class CriticalDimensionPanel:
                 f"from the anomaly: {result.from_anomaly}" if informative
                 else "level 1 has no ghosts in any dimension",
                 ok=(result.from_norms == result.from_anomaly) if informative else None,
+                declined=not informative,
             )
         )
         lines.append(
@@ -233,6 +234,7 @@ class CriticalDimensionPanel:
                 f"from the anomaly: {result.from_anomaly}" if informative
                 else "level 1 matches at every dimension",
                 ok=(result.from_counting == result.from_anomaly) if informative else None,
+                declined=not informative,
             )
         )
         if here is not None:

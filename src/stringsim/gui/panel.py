@@ -159,29 +159,66 @@ class Line:
     reached another way, when there is another way, and ``ok`` says whether the
     two agree -- so a reader watches the agreement survive a parameter moving,
     which is a stronger thing to see than a passing test.
+
+    There is a third state and it is not a shade of the second.  A comparison
+    can be *shown* without a verdict being claimed: the D1 tension equals
+    ``dp_brane_tension`` only at zero axion, a fitted Hagedorn slope is not
+    supposed to equal its limit at a finite truncation, an anomaly scan told to
+    stop at ``SO(30)`` cannot find ``SO(32)``.  Marking those red would say the
+    two routes disagree, which is false; leaving them as ordinary text would
+    hide that a comparison was on offer.  ``declined=True`` is how a line says
+    "this is a comparison, and no verdict is being made at these settings".
     """
 
     label: str
     value: str
     check: str = ""
     ok: bool | None = None
+    declined: bool = False
+
+    def __post_init__(self) -> None:
+        """Force ``ok`` to a real ``bool``.
+
+        A comparison written as ``ok=residual < 1e-9`` on numpy operands yields
+        a ``numpy.bool_``, for which *both* ``is True`` and ``is False`` are
+        false.  Anything summarising these lines by identity then counts an
+        agreement as neither -- and, worse, misses a disagreement entirely.
+        That is what happened: three lines were arriving as ``numpy.bool_`` and
+        the summary screen was quietly under-reporting.
+        """
+        if self.ok is not None and not isinstance(self.ok, bool):
+            object.__setattr__(self, "ok", bool(self.ok))
 
     @property
     def is_check(self) -> bool:
+        """A verdict was given, either way."""
         return self.ok is not None
 
+    @property
+    def is_declined(self) -> bool:
+        """A comparison is on offer and no verdict is being made."""
+        return self.ok is None and self.declined
+
+    @property
+    def is_comparison(self) -> bool:
+        return self.is_check or self.is_declined
+
     def verdict(self) -> str:
-        """``''``, ``'ok'`` or ``'FAILS'`` -- what the app puts in the margin."""
+        """``''``, ``'ok'``, ``'FAILS'`` or ``'n/a'`` -- the margin of the readout."""
         if self.ok is None:
-            return ""
+            return "n/a" if self.declined else ""
         return "ok" if self.ok else "FAILS"
 
     def agreeing(self, ok: bool) -> Line:
-        return replace(self, ok=ok)
+        return replace(self, ok=ok, declined=False)
+
+    def not_here(self) -> Line:
+        """The same line, with its verdict withdrawn rather than turned red."""
+        return replace(self, ok=None, declined=True)
 
     def __str__(self) -> str:
         tail = f"   [{self.check}]" if self.check else ""
-        mark = f" {self.verdict()}" if self.is_check else ""
+        mark = f" {self.verdict()}" if self.is_comparison else ""
         return f"{self.label}: {self.value}{tail}{mark}"
 
 
