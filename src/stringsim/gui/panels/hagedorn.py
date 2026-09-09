@@ -175,6 +175,7 @@ class HagedornPanel:
                 "beta_H",
                 f"{result.fit.beta_hagedorn:.6f} from the count",
                 f"2 pi sqrt(c/6) = {result.predicted:.6f}",
+                declined=True,
             ),
             Line("  relative gap", f"{result.gap:.4%}"),
             Line(

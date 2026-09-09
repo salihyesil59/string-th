@@ -282,6 +282,7 @@ class PQPanel:
                     "only at C_0 = 0",
                     f"|tau| = {abs(result.tau):.6f} rather than 1/g_s = "
                     f"{1.0 / result.coupling:.6f}",
+                    declined=True,
                 )
             )
         return lines

@@ -252,6 +252,7 @@ class AnomalyPanel:
                 "survivors",
                 ", ".join(result.survivors) if result.survivors else "none in this window",
                 f"{', '.join(result.out_of_reach)} cannot be reached by this window",
+                declined=True,
             ),
         ]
         for name, value in result.coefficients:

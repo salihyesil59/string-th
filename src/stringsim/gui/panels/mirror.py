@@ -267,6 +267,7 @@ class MirrorPanel:
                 "Euler characteristic",
                 f"2(h11 - h21) = {result.numbers.euler:+d}",
                 "no independent route here: the ambient space is weighted",
+                declined=True,
             ),
             Line(
                 "Greene-Plesser group",

@@ -13,6 +13,7 @@ from __future__ import annotations
 from .anomaly import AnomalyPanel
 from .bion import BIonPanel
 from .branes import BranePanel
+from .checks import ChecksPanel
 from .critical import CriticalDimensionPanel
 from .hagedorn import HagedornPanel
 from .mirror import MirrorPanel
@@ -35,9 +36,11 @@ __all__ = [
     "OrbifoldPanel",
     "BIonPanel",
     "AnomalyPanel",
+    "ChecksPanel",
 ]
 
 REGISTRY = (
+    ChecksPanel(),
     CriticalDimensionPanel(),
     HagedornPanel(),
     TDualityPanel(),

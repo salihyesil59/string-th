@@ -20,6 +20,7 @@ import re
 import sys
 import threading
 import time
+from functools import cache
 
 import matplotlib
 import pytest
@@ -43,6 +44,7 @@ from stringsim.gui.panel import (  # noqa: E402
 from stringsim.gui.panels.anomaly import AnomalyPanel  # noqa: E402
 from stringsim.gui.panels.bion import BIonPanel  # noqa: E402
 from stringsim.gui.panels.branes import BranePanel  # noqa: E402
+from stringsim.gui.panels.checks import ChecksPanel  # noqa: E402
 from stringsim.gui.panels.critical import CriticalDimensionPanel  # noqa: E402
 from stringsim.gui.panels.hagedorn import HagedornPanel  # noqa: E402
 from stringsim.gui.panels.mirror import FAMILIES, MirrorPanel  # noqa: E402
@@ -55,6 +57,23 @@ from stringsim.quantum.virasoro import lightcone_count  # noqa: E402
 
 TDUALITY = TDualityPanel()
 TDUALITY_IN_REGISTRY = next(p for p in REGISTRY if isinstance(p, TDualityPanel))
+
+
+@cache
+def result_of(title: str, where: str = "their defaults"):
+    """One panel's result at one corner, computed once for the whole file.
+
+    Several tests walk the whole registry, and the summary panel runs every
+    other panel each time it is asked.  Without this the file spends most of a
+    minute recomputing identical answers; the coverage is the same either way.
+    """
+    from stringsim.gui.panels.checks import settings_for
+
+    panel = next(item for item in REGISTRY if item.title == title)
+    return panel, panel.compute(**settings_for(panel, where))
+
+
+OTHER_PANELS = tuple(p.title for p in REGISTRY if p.title != "Every check at once")
 
 
 # --------------------------------------------------------------------------
@@ -112,8 +131,17 @@ def test_the_panels_import_without_tkinter(monkeypatch) -> None:
     This is what makes the panels testable at all, and it is the reason a
     second front end would be another ``app.py`` rather than a rewrite -- so it
     is worth a test rather than a comment.
+
+    Reimporting a package rebinds each submodule as an *attribute* of its
+    parent, and ``monkeypatch`` restores ``sys.modules`` without undoing that.
+    The two then disagree, and ``import stringsim.gui.panels as x`` -- which
+    resolves through the attribute -- hands a later test a module object that
+    nothing else is using.  That cost an afternoon once; the attributes are put
+    back here rather than left for the next test to trip over.
     """
-    for name in [m for m in sys.modules if m.startswith("stringsim.gui")]:
+    names = [m for m in sys.modules if m.startswith("stringsim.gui")]
+    saved = {name: sys.modules[name] for name in names}
+    for name in names:
         monkeypatch.delitem(sys.modules, name, raising=False)
     monkeypatch.setitem(sys.modules, "tkinter", None)
 
@@ -121,6 +149,12 @@ def test_the_panels_import_without_tkinter(monkeypatch) -> None:
         importlib.import_module("tkinter")
     module = importlib.import_module("stringsim.gui.panels")
     assert module.REGISTRY
+
+    for name, original in saved.items():
+        parent, _, leaf = name.rpartition(".")
+        holder = saved.get(parent) or sys.modules.get(parent)
+        if holder is not None:
+            setattr(holder, leaf, original)
 
 
 # --------------------------------------------------------------------------
@@ -624,18 +658,20 @@ def test_the_veneziano_figure_carries_both_sets_of_marks() -> None:
 def test_every_panel_carries_prose_of_all_three_kinds() -> None:
     """Static background, things to try, and notes about the current result."""
     for panel in REGISTRY:
+        _, result = result_of(panel.title)
         assert background_of(panel), panel.title
         assert suggestions_of(panel), panel.title
-        assert notes_of(panel, panel.compute()), panel.title
+        assert notes_of(panel, result), panel.title
 
 
 def test_the_prose_is_paragraphs_rather_than_fragments() -> None:
     """Each piece is a sentence or more, so the notes read rather than list."""
     for panel in REGISTRY:
+        _, result = result_of(panel.title)
         for paragraph in (
             *background_of(panel),
             *suggestions_of(panel),
-            *notes_of(panel, panel.compute()),
+            *notes_of(panel, result),
         ):
             # No rule about the first character: a paragraph may open with a
             # charge, "(1, 1) has coprime charges", or with a symbol,
@@ -654,10 +690,11 @@ def test_the_prose_carries_no_markup_the_window_cannot_render() -> None:
     """
     emphasis = re.compile(r"\*[A-Za-z][A-Za-z ]{0,30}\*")
     for panel in REGISTRY:
+        _, result = result_of(panel.title)
         for paragraph in (
             *background_of(panel),
             *suggestions_of(panel),
-            *notes_of(panel, panel.compute()),
+            *notes_of(panel, result),
         ):
             assert "`" not in paragraph, (panel.title, paragraph)
             assert not emphasis.search(paragraph), (panel.title, paragraph)
@@ -1354,3 +1391,231 @@ def test_the_panel_says_it_is_not_a_uniqueness_proof() -> None:
     assert "uniqueness proof" in " ".join(
         background_of(ANOMALY)
     )
+
+
+# --------------------------------------------------------------------------
+# the third state a readout line can be in
+# --------------------------------------------------------------------------
+
+
+def test_a_line_can_show_a_comparison_without_making_a_claim() -> None:
+    """Three states, not two shades of one.
+
+    A verdict of ``False`` says the two routes disagree.  A declined line says
+    no comparison was made here.  Drawing the second as a pale version of the
+    first would be the easiest way to make the summary lie.
+    """
+    agreed = Line("t", "1.0", "1.0", ok=True)
+    failed = Line("t", "1.0", "2.0", ok=False)
+    declined = Line("t", "1.0", "only at C_0 = 0", declined=True)
+    plain = Line("t", "1.0")
+
+    assert (agreed.is_check, agreed.is_declined, agreed.verdict()) == (True, False, "ok")
+    assert (failed.is_check, failed.is_declined, failed.verdict()) == (True, False, "FAILS")
+    assert (declined.is_check, declined.is_declined, declined.verdict()) == (
+        False,
+        True,
+        "n/a",
+    )
+    assert (plain.is_check, plain.is_declined, plain.verdict()) == (False, False, "")
+
+    assert agreed.is_comparison and failed.is_comparison and declined.is_comparison
+    assert not plain.is_comparison
+
+
+def test_withdrawing_and_restoring_a_verdict() -> None:
+    line = Line("t", "1.0", "1.0", ok=True)
+    assert line.not_here().is_declined
+    assert not line.not_here().is_check
+    assert line.not_here().agreeing(True).is_check
+    assert not line.not_here().agreeing(True).declined
+
+
+def test_the_declining_lines_are_marked_as_comparisons() -> None:
+    """The six places that drop a verdict say so in the type, not only in prose.
+
+    Before this they were ordinary text lines, indistinguishable from a label,
+    so a summary counting comparisons could not see them at all.
+    """
+    from stringsim.gui.panels.checks import WHERE
+
+    found: set[str] = set()
+    for where in WHERE:
+        for title in OTHER_PANELS:
+            panel, result = result_of(title, where)
+            for line in panel.readout(result):
+                if line.is_declined:
+                    found.add(title)
+    assert found == {
+        "The Hagedorn temperature",
+        "D = 26, from two sides",
+        "Anomaly cancellation",
+        "(p,q) strings of type IIB",
+        "Mirror symmetry",
+    }
+    # The Veneziano panel's declined line needs alpha(t) to be a non-negative
+    # integer, which no corner of its controls happens to produce -- so it is
+    # asserted at the setting that does rather than assumed to be covered.
+    on_shell = VENEZIANO.compute(intercept=1.35, mandelstam_t=-0.35)
+    residues = next(
+        line for line in VENEZIANO.readout(on_shell) if line.label == "residues"
+    )
+    assert residues.is_declined and residues.verdict() == "n/a"
+
+
+# --------------------------------------------------------------------------
+# every check at once
+# --------------------------------------------------------------------------
+
+CHECKS = ChecksPanel()
+
+
+@cache
+def summary(where: str = "their defaults"):
+    """The whole registry run once per corner, not once per test."""
+    return CHECKS.compute(where=where)
+
+
+def test_the_summary_runs_every_other_panel() -> None:
+    """One row per panel, and it is not itself one of them."""
+    result = summary()
+    assert result.panels == len(REGISTRY) - 1
+    assert "Every check at once" not in {name for name, _ in result.rows}
+    assert result.errors == ()
+
+
+def test_everything_agrees_at_the_defaults() -> None:
+    """Which is the whole claim the package makes, on one screen."""
+    result = summary()
+    assert result.made >= 40
+    assert result.agreed == result.made
+    assert result.failures == ()
+    assert result.all_agree
+
+
+def test_the_rows_are_the_registry_rather_than_a_list() -> None:
+    """So a panel's checks appear here without this panel being edited.
+
+    A summary maintained by hand would drift from what is computed, and would
+    drift silently.
+    """
+    result = summary()
+    titles = [name for name, _ in result.rows]
+    assert titles == [p.title for p in REGISTRY if p.title != "Every check at once"]
+
+    for panel in REGISTRY:
+        if panel.title == "Every check at once":
+            continue
+        row = next(checks for name, checks in result.rows if name == panel.title)
+        _, own = result_of(panel.title)
+        expected = [line.ok for line in panel.readout(own) if line.is_comparison]
+        assert [ok for _, ok in row] == expected, panel.title
+
+
+@pytest.mark.parametrize("where", ["the low end of every control", "the high end"])
+def test_only_the_two_intercept_panels_part_at_the_corners(where: str) -> None:
+    """Everything else survives the ends of its own ranges, which is the point.
+
+    The defaults are where a mistake is least likely to show, so agreeing there
+    proves less than agreeing at the corners.
+    """
+    result = summary(where)
+    assert result.failures
+    assert {panel for panel, _ in result.failures} <= {
+        "D = 26, from two sides",
+        "The Veneziano amplitude",
+    }
+    assert result.errors == ()
+    assert "the panels working" in " ".join(CHECKS.notes(result))
+
+
+def test_a_declined_comparison_is_counted_but_not_failed() -> None:
+    """It is in the rows as ``None`` -- neither an agreement nor a disagreement."""
+    result = summary("the low end of every control")
+    assert result.skipped > 0
+    assert result.made + result.skipped == sum(len(checks) for _, checks in result.rows)
+    assert result.agreed == result.made - len(result.failures)
+    assert "not a comparison that failed" in " ".join(CHECKS.notes(result))
+
+
+def test_no_corner_makes_a_panel_raise() -> None:
+    """Every control combination the summary can produce is one a panel answers."""
+    from stringsim.gui.panels.checks import WHERE
+
+    for where in WHERE:
+        assert summary(where).errors == ()
+
+
+def test_a_panel_that_raises_gets_an_empty_row_rather_than_none() -> None:
+    """Not answering is not passing, so it must still occupy a row."""
+
+    class Broken:
+        title = "broken"
+        blurb = "raises"
+        controls = ()
+
+        def compute(self):
+            raise ValueError("deliberate")
+
+        def readout(self, result):  # pragma: no cover - never reached
+            raise AssertionError
+
+    panel = ChecksPanel()
+    # Resolved through sys.modules, which is what ``from . import REGISTRY``
+    # inside the panel uses.  ``import ... as`` goes through the parent
+    # package's attribute instead, and the two can differ.
+    registry_module = sys.modules["stringsim.gui.panels"]
+    original = list(registry_module.REGISTRY)
+
+    registry_module.REGISTRY = (*original, Broken())
+    try:
+        result = panel.compute()
+    finally:
+        registry_module.REGISTRY = tuple(original)
+
+    assert ("broken", ()) in result.rows
+    assert any(name == "broken" for name, _ in result.errors)
+    assert not result.all_agree
+
+
+def test_the_summary_figure_names_the_three_states() -> None:
+    import matplotlib.pyplot as plt
+
+    before = plt.get_fignums()
+    figure = CHECKS.draw(summary())
+    assert isinstance(figure, Figure)
+    assert "agree" in figure.axes[0].get_title()
+    assert plt.get_fignums() == before
+
+
+def test_a_verdict_is_a_real_bool_and_not_a_numpy_one() -> None:
+    """Because ``numpy.bool_(True) is True`` is false, and so is ``is False``.
+
+    A comparison written as ``ok=residual < 1e-9`` on numpy operands produces
+    one.  Anything summarising by identity then counts an agreement as neither
+    state and, worse, misses a disagreement outright -- which is what the
+    summary screen was doing to three lines before ``Line`` started coercing.
+    """
+    import numpy as np
+
+    coerced = Line("t", "1", "1", ok=np.bool_(True))
+    assert coerced.ok is True
+    assert isinstance(coerced.ok, bool)
+    assert Line("t", "1", "2", ok=np.bool_(False)).ok is False
+
+    for panel in REGISTRY:
+        _, result = result_of(panel.title)
+        for line in panel.readout(result):
+            if line.ok is not None:
+                assert line.ok is True or line.ok is False, (panel.title, line.label)
+
+
+def test_the_summary_counts_every_agreement_it_draws() -> None:
+    """The figure counts by identity, so the rows and the totals must match."""
+    for where in ("their defaults", "the low end of every control"):
+        result = summary(where)
+        by_identity = sum(1 for _, checks in result.rows for _, v in checks if v is True)
+        assert by_identity == result.agreed
+        assert sum(
+            1 for _, checks in result.rows for _, v in checks if v is False
+        ) == len(result.failures)

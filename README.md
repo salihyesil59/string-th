@@ -26,7 +26,7 @@ is where those cross-checks live.
 python -m stringsim                       # summary of everything, in one screen
 python -m stringsim --gui                 # the same, with the parameters live
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 1529 checks
+python -m pytest                          # 1543 checks
 ```
 
 ---
@@ -2163,6 +2163,7 @@ the package already had and which decides the question its own way.
 | The Myers effect | `N`, the background flux | a matrix minimum vs a wrapped D2; `Tr J^2` vs `1 - 1/N^2` |
 | `(p,q)` strings | `g_s`, `C_0`, the charges | ten dimensions vs eleven; `SL(2,Z)` on the tension; a junction's net force |
 | The Veneziano amplitude | the Regge intercept, `t` | the poles vs the mass levels; a residue limit vs its closed form |
+| **Every check at once** | which corner of every panel | all of the above, run together |
 | Mirror symmetry | the family, and which side | Batyrev's count vs `int c_3` — where that formula applies |
 
 **The slider is logarithmic where ratios are what matter.** Under
@@ -2227,6 +2228,30 @@ neither a matrix nor a count in it. Move the intercept `a` off 1 and all three
 stop agreeing, because `a = (D-2)/24` is 1 exactly when `D` is 26: they were
 never two facts.
 
+#### One screen for the whole argument
+
+The last panel runs every other one and shows the verdicts together. It is the
+only place the package's claim appears whole: not "here is a number" but "here
+are forty-one numbers, each reached twice by code that shares nothing, and here
+is whether they agree".
+
+It is built from the registry rather than from a list. A panel added anywhere
+brings its checks here with no edit; a check deleted drops out of the count. A
+summary kept by hand would drift from what is computed, and would drift
+silently.
+
+Its control is a corner of every panel's parameter space at once — the low or
+high end of every slider and spinbox. At the defaults all 41 agree. At the
+corners exactly two panels part company, and they are the two whose sliders
+exist in order to break an agreement: `a = 1` and `D = 26` are one statement,
+and the Veneziano amplitude's poles sit on the string's mass levels only at the
+string's own intercept. Everything else survives the ends of its own ranges,
+which is a stronger thing than surviving the settings it was written with.
+
+A dot has three states and the third is not a shade of the second. Green
+agrees, red disagrees, and a hollow ring is a comparison that does not apply
+here. Colouring the rings red would be the easiest way to make the screen lie.
+
 #### Reading it, not only operating it
 
 Sliders without prose are a control surface. Each panel therefore carries three
@@ -2271,7 +2296,7 @@ def readout(self, result) -> list[Line]  # the numbers, and the checks on them
 
 `Control` is a dataclass, so `app.py` builds the widgets and no panel imports
 tkinter. That is what lets the physics be tested the way everything else here is
-tested — 220 of this module's 226 tests need no display at all, and one of them
+tested — 234 of this module's 240 tests need no display at all, and one of them
 blocks the `tkinter` import outright and checks that the panels still load. The
 remaining six build a window, walk the registry, and let each panel compute,
 draw and report; they skip where there is no display, and none of them asserts
@@ -2291,7 +2316,7 @@ adding a sixth box to a legend already sitting on the curves.
 
 #### What is not there yet
 
-Eleven panels carrying 41 checks between them, all recomputed as the controls
+Twelve panels; eleven of them carry 41 checks and the twelfth runs all of them, all recomputed as the controls
 move. The registry is a tuple and the app reads everything off it, so adding
 another is a module and a line — but which of the 29 examples make good panels
 is a decision per example, and the ones that print a table are better left as
@@ -2349,8 +2374,13 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-1529 checks.  Two minutes on a quiet machine and six on a busy one -- the
-same suite has been timed at both, so the number is not quoted. They are cross-checks rather than regression
+1543 checks, and seven and a half minutes the last time the whole thing was
+timed -- on a machine that was busy, which is also where the older six-minute
+figure came from.  The two-minute number was a quiet machine and a smaller suite
+with no window in it; `tests/test_gui.py` alone now takes about a hundred
+seconds, most of that the summary panel running every other panel three times
+over.  All three numbers were measured rather than estimated, which is why they
+disagree.  They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
 

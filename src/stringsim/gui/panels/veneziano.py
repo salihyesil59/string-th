@@ -245,6 +245,7 @@ class VenezianoPanel:
                 "residues",
                 "not defined here",
                 "alpha(t) is a non-negative integer",
+                declined=True,
             )
             if result.t_on_shell
             else Line(
