@@ -67,7 +67,12 @@ def launch(panels: tuple[Panel, ...] = REGISTRY, *, title: str = "stringsim") ->
     from .app import App
 
     root.title(title)
-    root.geometry("1080x820")
+    # As much of the screen as the figures want, without ever running off it:
+    # two subplots side by side need height a wide short strip does not give
+    # them, and a laptop should not open a window taller than its display.
+    width = min(1180, root.winfo_screenwidth() - 80)
+    height = min(1000, root.winfo_screenheight() - 120)
+    root.geometry(f"{max(760, width)}x{max(560, height)}")
     root.minsize(760, 560)
     _use_native_theme(root)
 
