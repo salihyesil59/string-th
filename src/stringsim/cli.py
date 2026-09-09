@@ -4,7 +4,9 @@
 particle content, the critical dimension, the Hagedorn temperature and the
 Regge trajectory -- every number produced by the modules rather than quoted.
 
-``python -m stringsim --figures DIR`` additionally writes the figures.
+``python -m stringsim --figures DIR`` additionally writes the figures, and
+``python -m stringsim --gui`` opens a window instead, where the same numbers are
+recomputed -- checks and all -- as a parameter moves.
 """
 
 from __future__ import annotations
@@ -107,6 +109,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--dim", type=int, default=26, help="spacetime dimension (default 26)")
     parser.add_argument(
+        "--gui",
+        action="store_true",
+        help="open the window instead of printing, so parameters can be moved",
+    )
+    parser.add_argument(
         "--figures",
         type=Path,
         default=None,
@@ -114,6 +121,11 @@ def main(argv: list[str] | None = None) -> int:
         help="also write the figures from the examples into DIR",
     )
     args = parser.parse_args(argv)
+
+    if args.gui:
+        from .gui import launch
+
+        return launch()
 
     conv = Conventions(alpha_prime=args.alpha_prime, dim=args.dim)
     print(summary(conv))
