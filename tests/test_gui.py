@@ -40,6 +40,7 @@ from stringsim.gui.panel import (  # noqa: E402
     notes_of,
     suggestions_of,
 )
+from stringsim.gui.panels.bion import BIonPanel  # noqa: E402
 from stringsim.gui.panels.branes import BranePanel  # noqa: E402
 from stringsim.gui.panels.critical import CriticalDimensionPanel  # noqa: E402
 from stringsim.gui.panels.hagedorn import HagedornPanel  # noqa: E402
@@ -1144,3 +1145,101 @@ def test_every_orbifold_draws_its_cell() -> None:
         figure = ORBIFOLD.draw(ORBIFOLD.compute(label=label))
         assert isinstance(figure, Figure)
     assert plt.get_fignums() == before
+
+
+# --------------------------------------------------------------------------
+# a string ending on a brane
+# --------------------------------------------------------------------------
+
+BION = BIonPanel()
+
+
+@pytest.mark.parametrize("p", [3, 4, 5, 6])
+@pytest.mark.parametrize("n_strings", [1, 3, 6])
+def test_the_flux_counts_the_strings_at_every_radius(p: int, n_strings: int) -> None:
+    r"""It must not depend on the surface, because :math:`X` is harmonic.
+
+    Measured through spheres of three different radii, so a formula that
+    happened to give the right answer at one of them would be caught.
+    """
+    result = BION.compute(n_strings=n_strings, p=p)
+    assert result.flux_error < 1e-9
+    assert result.flux_spread < 1e-12
+    assert all(value == pytest.approx(n_strings) for value in result.flux)
+
+
+@pytest.mark.parametrize("p", [3, 4, 5, 6])
+@pytest.mark.parametrize("n_strings", [1, 2, 5])
+def test_the_spike_weighs_that_many_fundamental_strings(p: int, n_strings: int) -> None:
+    r"""``T_p int |grad X|^2`` divided by the height, against ``n / 2 pi alpha'``.
+
+    One side is a numerical integral over the brane; the other is a string
+    tension.  The sphere area, the brane tension and the harmonic exponent all
+    change with ``p`` and the ratio does not.
+    """
+    result = BION.compute(n_strings=n_strings, p=p)
+    assert result.tension_ratio == pytest.approx(1.0, abs=1e-6)
+    assert result.string_tension == pytest.approx(n_strings / (2 * math.pi))
+
+
+@pytest.mark.parametrize("p", [3, 4, 5, 6])
+@pytest.mark.parametrize("slope", [0.05, 0.3, 1.2, 2.0])
+def test_the_legendre_transform_lands_on_the_gradient(p: int, slope: float) -> None:
+    r"""``D = dL/dE`` by central differences, not by writing ``grad X`` twice.
+
+    At ``2 pi alpha' E = grad X`` the two coincide and the Bogomolny gap
+    vanishes, which is what makes the spike BPS.  Differentiating the
+    Lagrangian numerically is the whole point: the bound and the configuration
+    are then computed from different code.
+    """
+    result = BION.compute(p=p, slope=slope)
+    assert result.displacement == pytest.approx(result.gradient, abs=1e-7)
+    assert result.bps
+    assert abs(result.gap) < 1e-12
+    assert result.energy == pytest.approx(result.bound, abs=1e-12)
+
+
+def test_the_determinant_two_ways() -> None:
+    """The matrix's determinant against the closed form the literature writes."""
+    result = BION.compute()
+    assert result.determinant_gap < 1e-12
+    assert result.determinant_matrix == pytest.approx(result.determinant_closed)
+
+
+def test_the_probe_field_is_below_critical() -> None:
+    """So the determinant shown is one the Lagrangian is real at.
+
+    An earlier version probed at a field past ``E_crit``.  Both routes still
+    agreed there -- on a number describing a configuration that does not exist,
+    since the square root is imaginary beyond it.
+    """
+    result = BION.compute()
+    assert result.probe_fraction == (0.4, 0.2)
+    assert sum(f**2 for f in result.probe_fraction) < 1.0
+    assert result.determinant_matrix > 0.0
+
+
+def test_the_critical_field_is_the_string_tension() -> None:
+    r"""``E_crit = 1 / 2 pi alpha'``, which is what a fundamental string weighs."""
+    result = BION.compute()
+    assert result.critical == pytest.approx(1.0 / (2 * math.pi))
+    assert result.critical == pytest.approx(result.string_tension / result.n_strings)
+
+
+def test_more_strings_widen_the_mouth_rather_than_deepening_it() -> None:
+    """``q`` is proportional to ``n``, and every spike is infinitely tall."""
+    result = BION.compute(n_strings=4)
+    charges = [charge for _, charge in result.profiles]
+    assert len(charges) == 4
+    for n, charge in enumerate(charges, start=1):
+        assert charge == pytest.approx(n * charges[0])
+
+
+def test_every_bion_check_agrees_across_the_controls() -> None:
+    for p in (3, 5):
+        for n_strings in (1, 4):
+            for slope in (0.1, 1.5):
+                lines = BION.readout(
+                    BION.compute(n_strings=n_strings, p=p, slope=slope)
+                )
+                assert all(line.ok for line in lines if line.is_check), (p, n_strings, slope)

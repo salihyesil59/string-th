@@ -10,6 +10,7 @@ the ideas are worth meeting, the same order the README uses.
 
 from __future__ import annotations
 
+from .bion import BIonPanel
 from .branes import BranePanel
 from .critical import CriticalDimensionPanel
 from .hagedorn import HagedornPanel
@@ -31,6 +32,7 @@ __all__ = [
     "MyersPanel",
     "MirrorPanel",
     "OrbifoldPanel",
+    "BIonPanel",
 ]
 
 REGISTRY = (
@@ -39,6 +41,7 @@ REGISTRY = (
     TDualityPanel(),
     OrbifoldPanel(),
     BranePanel(),
+    BIonPanel(),
     MyersPanel(),
     PQPanel(),
     VenezianoPanel(),
