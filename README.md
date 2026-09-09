@@ -26,7 +26,7 @@ is where those cross-checks live.
 python -m stringsim                       # summary of everything, in one screen
 python -m stringsim --gui                 # the same, with the parameters live
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 1415 checks
+python -m pytest                          # 1451 checks
 ```
 
 ---
@@ -2151,13 +2151,16 @@ the package already had and which decides the question its own way.
 
 #### The panels
 
-| panel | what moves | the two routes |
+| panel | what moves | the independent routes |
 |---|---|---|
 | `D = 26`, from two sides | the intercept `a`, the level | a Gram signature, a state count, and `c = D - 26` |
+| The Hagedorn temperature | levels counted, species `c` | counted partitions vs Cardy's `2 pi sqrt(c/6)` |
 | T-duality on a circle | `R`, and the truncations | the sorted spectra subtracted, vs `spectrum_is_t_dual` |
 | D-branes pulled apart | the separation, the stack | `sum n_i^2` vs a walk over ordered pairs; `2 pi sqrt(alpha')` vs a bisection |
+| The Myers effect | `N`, the background flux | a matrix minimum vs a wrapped D2; `Tr J^2` vs `1 - 1/N^2` |
 | `(p,q)` strings | `g_s`, `C_0`, the charges | ten dimensions vs eleven; `SL(2,Z)` on the tension; a junction's net force |
 | The Veneziano amplitude | the Regge intercept, `t` | the poles vs the mass levels; a residue limit vs its closed form |
+| Mirror symmetry | the family, and which side | Batyrev's count vs `int c_3` — where that formula applies |
 
 **The slider is logarithmic where ratios are what matter.** Under
 `R -> alpha'/R` a radius and its dual are reflections of each other, and on a
@@ -2184,14 +2187,29 @@ leaving the amplitude untouched. The residues still match their closed form,
 crossing symmetry still holds to machine precision, and the poles have simply
 walked off the spectrum. The readout says which of those is which.
 
-**Two lines decline to claim what is not true.** `T_{0,1}` equals
-`dp_brane_tension(1, g_s)` only when the axion vanishes, because `|tau| = 1/g_s`
-only there; away from `C_0 = 0` that line drops its verdict and prints both
-numbers instead of reporting a failure of something never claimed. Likewise a
-momentum transfer with `alpha(t)` a non-negative integer puts `A` on a
-`t`-channel resonance, singular at every `s`, and the residue line says so
-rather than reporting `nan` as an error. Both configurations are reachable from
-the sliders, which is why they are handled rather than avoided.
+**Some lines decline to claim what is not true.** A red mark should mean "these
+two routes disagree", not "you have moved a control somewhere the comparison
+does not apply". Five places in the panels drop their verdict instead of
+failing, and each is reachable from the sliders:
+
+- `T_{0,1}` equals `dp_brane_tension(1, g_s)` only when the axion vanishes,
+  because `|tau| = 1/g_s` only there.
+- A momentum transfer with `alpha(t)` a non-negative integer puts `A` on a
+  `t`-channel resonance, singular at every `s`, so there is no limit for the
+  residue check to converge to.
+- At level 1 the ghost bound and the state count agree with 26 in *every*
+  dimension; they have no opinion about the critical dimension rather than a
+  wrong one.
+- The fitted Hagedorn slope is not supposed to equal `2 pi sqrt(c/6)` at a
+  finite truncation — it approaches it — so the verdict sits on whether the gap
+  *closed*, not on whether it is small.
+- Batyrev's Euler characteristic is checked against `int c_3` for the quintic
+  and for nothing else. That formula is for a smooth hypersurface in *ordinary*
+  projective space, where Calabi-Yau forces degree = `n + 1`; the weighted
+  families sit in singular ambient spaces and the manifold is a resolution.
+  Running it anyway returns `-516` against Batyrev's `-204` and reports a
+  failure of the count rather than of the comparison — which is what the first
+  version of that panel did, until the numbers were looked at.
 
 **A second check is meant to be seen failing, and it is the same lesson.** The
 `D = 26` panel puts three routes to the critical dimension side by side: the
@@ -2246,7 +2264,7 @@ def readout(self, result) -> list[Line]  # the numbers, and the checks on them
 
 `Control` is a dataclass, so `app.py` builds the widgets and no panel imports
 tkinter. That is what lets the physics be tested the way everything else here is
-tested — 106 of this module's 112 tests need no display at all, and one of them
+tested — 142 of this module's 148 tests need no display at all, and one of them
 blocks the `tkinter` import outright and checks that the panels still load. The
 remaining six build a window, walk the registry, and let each panel compute,
 draw and report; they skip where there is no display, and none of them asserts
@@ -2266,7 +2284,7 @@ adding a sixth box to a legend already sitting on the curves.
 
 #### What is not there yet
 
-Five panels of a possible fifteen or so. The registry is a tuple and the app
+Eight panels of a possible fifteen or so. The registry is a tuple and the app
 reads everything off it, so adding one is a module and a line — but which of the
 29 examples make good panels is a decision per example, and the ones that print
 a table are better as scripts. The animations are not in it either: the
@@ -2320,7 +2338,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-1415 checks.  Two minutes on a quiet machine and six on a busy one -- the
+1451 checks.  Two minutes on a quiet machine and six on a busy one -- the
 same suite has been timed at both, so the number is not quoted. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:

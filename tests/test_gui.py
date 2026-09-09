@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import importlib
 import math
+import re
 import sys
 import threading
 import time
@@ -41,6 +42,9 @@ from stringsim.gui.panel import (  # noqa: E402
 )
 from stringsim.gui.panels.branes import BranePanel  # noqa: E402
 from stringsim.gui.panels.critical import CriticalDimensionPanel  # noqa: E402
+from stringsim.gui.panels.hagedorn import HagedornPanel  # noqa: E402
+from stringsim.gui.panels.mirror import FAMILIES, MirrorPanel  # noqa: E402
+from stringsim.gui.panels.myers import MyersPanel  # noqa: E402
 from stringsim.gui.panels.pq import PQPanel  # noqa: E402
 from stringsim.gui.panels.tduality import TDualityPanel  # noqa: E402
 from stringsim.gui.panels.veneziano import VenezianoPanel  # noqa: E402
@@ -638,7 +642,14 @@ def test_the_prose_is_paragraphs_rather_than_fragments() -> None:
 
 
 def test_the_prose_carries_no_markup_the_window_cannot_render() -> None:
-    """A Tk text widget shows ``*emphasis*`` and backticks literally."""
+    """A Tk text widget shows ``*emphasis*`` and backticks literally.
+
+    A lone star is not markup: ``Delta*`` is what the dual of a lattice
+    polytope is called, and forbidding the character outright would ban the
+    notation along with the markdown.  What is looked for is a *pair* around a
+    word, which is the only form that would read as an artifact on screen.
+    """
+    emphasis = re.compile(r"\*[A-Za-z][A-Za-z ]{0,30}\*")
     for panel in REGISTRY:
         for paragraph in (
             *background_of(panel),
@@ -646,7 +657,7 @@ def test_the_prose_carries_no_markup_the_window_cannot_render() -> None:
             *notes_of(panel, panel.compute()),
         ):
             assert "`" not in paragraph, (panel.title, paragraph)
-            assert "*" not in paragraph, (panel.title, paragraph)
+            assert not emphasis.search(paragraph), (panel.title, paragraph)
 
 
 def test_a_panel_without_commentary_is_still_a_panel() -> None:
@@ -815,3 +826,213 @@ def test_setting_a_control_a_panel_does_not_have_says_so(root) -> None:
     with pytest.raises(KeyError, match="no control named 'coupling'"):
         bar.set("coupling", 1.0)
     bar.destroy()
+
+
+# --------------------------------------------------------------------------
+# the Hagedorn temperature
+# --------------------------------------------------------------------------
+
+HAGEDORN = HagedornPanel()
+
+
+def test_the_fitted_slope_approaches_cardy_s_closed_form() -> None:
+    r"""Counted partitions against :math:`2\pi\sqrt{c/6}`, which is ``4 pi`` at 24."""
+    result = HAGEDORN.compute()
+    assert result.predicted == pytest.approx(4 * math.pi)
+    assert result.gap < 0.01
+    assert result.fit.beta_hagedorn < result.predicted  # it approaches from below
+
+
+def test_the_gap_closes_when_more_levels_are_counted() -> None:
+    """The check that means something, since the two are not meant to be equal.
+
+    A fit over a finite window cannot reach the limit -- there is a subleading
+    ``log N`` -- so the panel fits twice and asks whether the distance shrank.
+    A wrong closed form would not be approached.
+    """
+    for n_max in (120, 240, 400):
+        result = HAGEDORN.compute(n_max=n_max, n_fit=min(100, n_max // 2))
+        assert result.converging
+        assert result.gap < result.coarse_gap
+
+
+def test_more_levels_gets_closer() -> None:
+    small = HAGEDORN.compute(n_max=120, n_fit=60)
+    large = HAGEDORN.compute(n_max=400, n_fit=60)
+    assert large.gap < small.gap
+
+
+def test_the_agreement_is_not_about_the_number_twenty_four() -> None:
+    """Both routes move together when the number of species changes."""
+    for species in (8, 12, 16, 24):
+        result = HAGEDORN.compute(n_species=species)
+        assert result.predicted == pytest.approx(2 * math.pi * math.sqrt(species / 6))
+        assert result.gap < 0.01
+
+
+def test_the_fitted_slope_line_carries_no_verdict() -> None:
+    """It is not supposed to equal the closed form at a finite truncation.
+
+    Marking it pass or fail against a tolerance would report how many levels
+    were counted, dressed up as a statement about the physics.
+    """
+    lines = HAGEDORN.readout(HAGEDORN.compute(n_max=60, n_fit=50))
+    slope = next(line for line in lines if line.label == "beta_H")
+    assert not slope.is_check
+
+    checks = [line for line in lines if line.is_check]
+    assert len(checks) == 1
+    assert "the gap closes" in checks[0].check
+    assert checks[0].ok
+
+
+def test_a_coarse_truncation_says_it_is_coarse() -> None:
+    assert "long way from converged" in " ".join(
+        HAGEDORN.notes(HAGEDORN.compute(n_max=60, n_fit=50))
+    )
+    assert "long way from converged" not in " ".join(
+        HAGEDORN.notes(HAGEDORN.compute(n_max=400, n_fit=150))
+    )
+
+
+# --------------------------------------------------------------------------
+# the Myers effect
+# --------------------------------------------------------------------------
+
+MYERS = MyersPanel()
+
+
+@pytest.mark.parametrize("total", [2, 4, 6, 9])
+def test_the_single_block_is_the_cheapest_configuration(total: int) -> None:
+    """Every partition of N is evaluated; one big sphere beats all of them."""
+    result = MYERS.compute(total=total)
+    assert result.sphere_wins
+    assert result.winner.partition == (total,)
+    assert result.commuting.energy == pytest.approx(0.0)
+    assert result.depth > 0.0
+
+
+@pytest.mark.parametrize("total", [2, 5, 7])
+def test_a_shrunk_d2_with_n_flux_quanta_weighs_n_d0_branes(total: int) -> None:
+    r""":math:`4\pi^2\alpha' T_2 = T_0`, with nothing fitted to make it so.
+
+    One side is a Born-Infeld energy at zero radius, the other is a D0-brane
+    tension times ``N``.  They agree because the tension formula has no freedom
+    in it, which is why a matrix model and a wrapped brane describe one object.
+    """
+    result = MYERS.compute(total=total)
+    assert result.shrunk_energy == pytest.approx(result.d0_energy)
+    assert result.shrunk_energy == pytest.approx(float(total))
+
+
+@pytest.mark.parametrize("total", [2, 3, 6, 9])
+def test_the_discretisation_error_is_exact(total: int) -> None:
+    r""":math:`\mathrm{Tr}\,J^2 / (N^3/4) = 1 - 1/N^2`, not approximately."""
+    result = MYERS.compute(total=total)
+    assert result.ratio == pytest.approx(1.0 - 1.0 / total**2, abs=1e-15)
+    assert result.ratio == pytest.approx(result.predicted_ratio, abs=1e-15)
+
+
+@pytest.mark.parametrize("flux", [0.1, 1.0, 3.0])
+def test_the_fuzzy_sphere_is_a_critical_point_of_the_potential(flux: float) -> None:
+    """Checked rather than declared: the gradient there, and the algebra closing."""
+    result = MYERS.compute(flux=flux)
+    assert result.gradient < 1e-9
+    assert result.algebra < 1e-12
+
+
+def test_every_myers_check_agrees_across_the_controls() -> None:
+    for total in (2, 5, 8):
+        for flux in (0.1, 1.0, 2.5):
+            lines = MYERS.readout(MYERS.compute(total=total, flux=flux))
+            assert all(line.ok for line in lines if line.is_check), (total, flux)
+
+
+# --------------------------------------------------------------------------
+# mirror symmetry
+# --------------------------------------------------------------------------
+
+MIRROR = MirrorPanel()
+
+
+def test_the_quintic_and_its_mirror() -> None:
+    """``(1, 101)`` one way and ``(101, 1)`` the other, with chi opposite."""
+    here = MIRROR.compute(label="P(1,1,1,1,1)[5]", side="the polytope")
+    there = MIRROR.compute(label="P(1,1,1,1,1)[5]", side="its dual")
+
+    assert (here.numbers.h11, here.numbers.h21) == (1, 101)
+    assert (there.numbers.h11, there.numbers.h21) == (101, 1)
+    assert here.swapped and there.swapped
+    assert here.numbers.euler == -there.numbers.euler == -200
+
+
+def test_the_quintic_euler_from_a_second_route() -> None:
+    r"""``int c_3`` over the hypersurface, with no polytope in the computation."""
+    result = MIRROR.compute(label="P(1,1,1,1,1)[5]")
+    assert result.has_chern_check
+    assert result.chern_euler == -200
+    assert result.euler_agrees
+
+
+@pytest.mark.parametrize("label", [name for name in FAMILIES if name != "P(1,1,1,1,1)[5]"])
+def test_the_chern_route_is_refused_where_it_does_not_apply(label: str) -> None:
+    """It is a formula for a smooth hypersurface in *ordinary* projective space.
+
+    Calabi-Yau there means degree = n + 1, which only the quintic satisfies
+    among these.  The rest sit in singular weighted spaces and the manifold is a
+    resolution.  Running the formula anyway compares ``-204`` against ``-516``
+    and blames Batyrev's count for the mismatch, so the panel does not run it.
+    """
+    result = MIRROR.compute(label=label)
+    assert not result.has_chern_check
+    assert result.chern_euler is None
+
+    line = next(
+        item for item in MIRROR.readout(result) if item.label == "Euler characteristic"
+    )
+    assert not line.is_check
+    assert "the ambient space is weighted" in line.check
+    assert "does not manufacture one" in " ".join(MIRROR.notes(result))
+
+
+@pytest.mark.parametrize(
+    ("label", "h11", "h21"),
+    [
+        ("P(1,1,1,1,1)[5]", 1, 101),
+        ("P(1,1,1,1,2)[6]", 1, 103),
+        ("P(1,1,1,1,4)[8]", 1, 149),
+        ("P(1,1,1,2,5)[10]", 1, 145),
+        ("P(1,1,1,6,9)[18]", 2, 272),
+    ],
+)
+def test_the_famous_families(label: str, h11: int, h21: int) -> None:
+    """Nothing in the computation knows these numbers; it counts lattice points."""
+    result = MIRROR.compute(label=label)
+    assert (result.numbers.h11, result.numbers.h21) == (h11, h21)
+    assert (result.mirror.h11, result.mirror.h21) == (h21, h11)
+
+
+def test_the_greene_plesser_scalings_are_enumerated() -> None:
+    r"""The smallest exponent is right for the quintic and wrong for ``P(1,1,1,2,5)``."""
+    quintic = MIRROR.compute(label="P(1,1,1,1,1)[5]")
+    assert (quintic.phases, quintic.scalings, quintic.group_order) == (5**4, 5, 125)
+
+    other = MIRROR.compute(label="P(1,1,1,2,5)[10]")
+    assert other.scalings == 10  # not min(10, 10, 10, 5, 2) = 2
+    assert other.group_order == 100
+
+
+def test_the_cloud_holds_each_family_once() -> None:
+    """The plot draws a point and its mirror itself, so passing both doubles it.
+
+    Every marker was being drawn four times before this was noticed: twice by
+    the scan and twice again by ``plot_mirror_hodge``, which reflects whatever
+    it is given.
+    """
+    cloud = MIRROR.compute().cloud
+    assert cloud
+    assert len(set(cloud)) == len(cloud)
+    # h11 is small and h21 large for these families, so the unswapped
+    # orientation is the one present.
+    assert all(a <= b for a, b in cloud)
+    assert (1, 101) in cloud and (101, 1) not in cloud
