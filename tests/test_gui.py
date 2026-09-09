@@ -45,6 +45,7 @@ from stringsim.gui.panels.critical import CriticalDimensionPanel  # noqa: E402
 from stringsim.gui.panels.hagedorn import HagedornPanel  # noqa: E402
 from stringsim.gui.panels.mirror import FAMILIES, MirrorPanel  # noqa: E402
 from stringsim.gui.panels.myers import MyersPanel  # noqa: E402
+from stringsim.gui.panels.orbifold import ORBIFOLDS, OrbifoldPanel  # noqa: E402
 from stringsim.gui.panels.pq import PQPanel  # noqa: E402
 from stringsim.gui.panels.tduality import TDualityPanel  # noqa: E402
 from stringsim.gui.panels.veneziano import VenezianoPanel  # noqa: E402
@@ -1036,3 +1037,110 @@ def test_the_cloud_holds_each_family_once() -> None:
     # orientation is the one present.
     assert all(a <= b for a, b in cloud)
     assert (1, 101) in cloud and (101, 1) not in cloud
+
+
+# --------------------------------------------------------------------------
+# orbifold fixed points
+# --------------------------------------------------------------------------
+
+ORBIFOLD = OrbifoldPanel()
+
+
+@pytest.mark.parametrize(
+    ("label", "sector", "points"),
+    [
+        ("T^2/Z_2", 1, 4),
+        ("T^2/Z_3 hexagonal", 1, 3),
+        ("T^2/Z_3 hexagonal", 2, 3),
+        ("T^2/Z_4 square", 1, 2),
+        ("T^2/Z_4 square", 2, 4),
+        ("T^2/Z_6 hexagonal", 1, 1),
+        ("T^2/Z_6 hexagonal", 2, 3),
+        ("T^2/Z_6 hexagonal", 3, 4),
+    ],
+)
+def test_the_fixed_points_are_counted_and_then_found(label, sector, points) -> None:
+    r"""``|det(1 - theta^k)|`` against an enumeration of lattice positions.
+
+    ``theta^2`` on the square lattice is the inversion, which is why ``Z_4``
+    has two fixed points at ``k = 1`` and four at ``k = 2``.
+    """
+    result = ORBIFOLD.compute(label=label, sector=sector)
+    assert result.fixed_from_determinant == points
+    assert result.fixed_from_enumeration == points
+    assert result.fixed_points_agree
+
+
+@pytest.mark.parametrize("label", list(ORBIFOLDS))
+def test_the_twisted_intercept_from_a_closed_form_and_from_a_mode_sum(label) -> None:
+    r"""``1 - (1/4) sum phi(1-phi)`` against a measured :math:`\zeta(-1,\phi)`.
+
+    The second route fits the small-``eps`` expansion of
+    ``sum (n+phi) exp(-eps(n+phi))`` and reads the constant term off it.  It
+    evaluates no closed form for the intercept anywhere.
+    """
+    result = ORBIFOLD.compute(label=label)
+    assert result.intercept_gap < 1e-6
+    assert result.intercept == pytest.approx(result.intercept_from_zeta, abs=1e-6)
+    # Loose enough to be the numerical route's precision and no looser.
+    assert result.intercept_gap > 0.0
+
+
+def test_the_z2_intercept_is_seven_eighths() -> None:
+    r"""Two directions at ``phi = 1/2``: ``a = 1 - 2/16 = 7/8``."""
+    result = ORBIFOLD.compute(label="T^2/Z_2")
+    assert result.phases == pytest.approx((0.5, 0.5))
+    assert result.intercept == pytest.approx(0.875)
+
+
+def test_a_sector_the_orbifold_does_not_have_is_named_rather_than_refused() -> None:
+    """Two independent controls can reach ``Z_2`` with ``k = 3``; one of them wins.
+
+    Refusing would put a traceback on screen for a combination a reader can
+    produce by moving one spinbox, so the panel uses the nearest sector that
+    exists and says in both the readout and the notes that it did.
+    """
+    result = ORBIFOLD.compute(label="T^2/Z_2", sector=4)
+    assert result.requested_sector == 4
+    assert result.sector == 1
+    assert result.sector_was_clamped
+    assert "does not exist here" in ORBIFOLD.readout(result)[0].check
+    assert "There is no sector k = 4" in " ".join(ORBIFOLD.notes(result))
+
+    plain = ORBIFOLD.compute(label="T^2/Z_6 hexagonal", sector=4)
+    assert not plain.sector_was_clamped
+    assert "There is no sector" not in " ".join(ORBIFOLD.notes(plain))
+
+
+@pytest.mark.parametrize("label", list(ORBIFOLDS))
+def test_the_projection_leaves_a_whole_number_of_states(label) -> None:
+    """Not automatic: a sign or conjugation error breaks exactly this.
+
+    ``untwisted_degeneracy`` raises rather than rounding if the character sum
+    comes out non-integral, so reaching a number at all is the check.
+    """
+    result = ORBIFOLD.compute(label=label)
+    assert isinstance(result.untwisted_massless, int)
+    assert 0 < result.untwisted_massless < result.torus_massless
+    assert result.torus_massless == 24**2
+
+
+@pytest.mark.parametrize("label", list(ORBIFOLDS))
+def test_the_twisted_ground_state_is_tachyonic_in_every_one(label) -> None:
+    """Which is the bosonic string's own tachyon, not one the orbifold added."""
+    result = ORBIFOLD.compute(label=label)
+    ground = result.ground_state
+    assert ground is not None
+    assert ground.is_tachyonic
+    assert ground.alpha_m2 == pytest.approx(-4.0 * result.intercept)
+    assert "this is a zero-point energy" in " ".join(ORBIFOLD.notes(result))
+
+
+def test_every_orbifold_draws_its_cell() -> None:
+    import matplotlib.pyplot as plt
+
+    before = plt.get_fignums()
+    for label in ORBIFOLDS:
+        figure = ORBIFOLD.draw(ORBIFOLD.compute(label=label))
+        assert isinstance(figure, Figure)
+    assert plt.get_fignums() == before

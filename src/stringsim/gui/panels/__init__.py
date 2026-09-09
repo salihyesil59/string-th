@@ -15,6 +15,7 @@ from .critical import CriticalDimensionPanel
 from .hagedorn import HagedornPanel
 from .mirror import MirrorPanel
 from .myers import MyersPanel
+from .orbifold import OrbifoldPanel
 from .pq import PQPanel
 from .tduality import TDualityPanel
 from .veneziano import VenezianoPanel
@@ -29,12 +30,14 @@ __all__ = [
     "HagedornPanel",
     "MyersPanel",
     "MirrorPanel",
+    "OrbifoldPanel",
 ]
 
 REGISTRY = (
     CriticalDimensionPanel(),
     HagedornPanel(),
     TDualityPanel(),
+    OrbifoldPanel(),
     BranePanel(),
     MyersPanel(),
     PQPanel(),
