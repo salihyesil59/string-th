@@ -12,6 +12,9 @@ from __future__ import annotations
 
 from .branes import BranePanel
 from .critical import CriticalDimensionPanel
+from .hagedorn import HagedornPanel
+from .mirror import MirrorPanel
+from .myers import MyersPanel
 from .pq import PQPanel
 from .tduality import TDualityPanel
 from .veneziano import VenezianoPanel
@@ -23,12 +26,18 @@ __all__ = [
     "BranePanel",
     "PQPanel",
     "VenezianoPanel",
+    "HagedornPanel",
+    "MyersPanel",
+    "MirrorPanel",
 ]
 
 REGISTRY = (
     CriticalDimensionPanel(),
+    HagedornPanel(),
     TDualityPanel(),
     BranePanel(),
+    MyersPanel(),
     PQPanel(),
     VenezianoPanel(),
+    MirrorPanel(),
 )
