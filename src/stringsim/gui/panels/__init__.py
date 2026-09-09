@@ -11,6 +11,7 @@ the ideas are worth meeting, the same order the README uses.
 from __future__ import annotations
 
 from .branes import BranePanel
+from .critical import CriticalDimensionPanel
 from .pq import PQPanel
 from .tduality import TDualityPanel
 from .veneziano import VenezianoPanel
@@ -18,12 +19,14 @@ from .veneziano import VenezianoPanel
 __all__ = [
     "REGISTRY",
     "TDualityPanel",
+    "CriticalDimensionPanel",
     "BranePanel",
     "PQPanel",
     "VenezianoPanel",
 ]
 
 REGISTRY = (
+    CriticalDimensionPanel(),
     TDualityPanel(),
     BranePanel(),
     PQPanel(),

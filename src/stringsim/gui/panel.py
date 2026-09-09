@@ -16,6 +16,12 @@ The readout is where the package's habit shows up on screen.  A
 independent* route to that number it carries the second value too, together
 with the residual between them -- recomputed every time a control moves, rather
 than asserted once in a test and then forgotten.
+
+Beside the numbers a panel may carry prose, in three kinds.  ``background`` is
+static and says where the physics comes from.  ``suggestions`` says what is
+worth doing to the controls.  :meth:`Panel.notes` is the one that earns the
+window: it describes *this* result, and a sentence that is only true at the
+self-dual radius is a sentence a static page cannot write.
 """
 
 from __future__ import annotations
@@ -35,6 +41,9 @@ __all__ = [
     "Panel",
     "defaults",
     "check_controls",
+    "background_of",
+    "suggestions_of",
+    "notes_of",
 ]
 
 
@@ -201,3 +210,42 @@ class Panel(Protocol):
 
     def readout(self, result: Any) -> list[Line]:
         """The numbers, and the independent checks on them."""
+
+    # Everything below is optional.  A panel that defines none of it still
+    # works; a panel that defines all of it can be read rather than merely
+    # operated, which for most of this package's subjects is the difference
+    # between a control surface and an explanation.
+
+    background: tuple[str, ...]
+    """Paragraphs that do not change: where the physics comes from."""
+
+    suggestions: tuple[str, ...]
+    """Things worth doing to the controls, and what to watch when you do."""
+
+    def notes(self, result: Any) -> list[str]:
+        """Paragraphs about *this* result -- what is true at these settings.
+
+        The one part of the commentary that a static page cannot carry.  A
+        radius that happens to be self-dual, an intercept that has walked the
+        poles off the spectrum, a coupling past the point where the D1 became
+        the lighter object: each is a sentence that is worth writing only while
+        it is true.
+        """
+
+
+# The three optional pieces, read off a panel that may not define them.  A
+# panel is a plain class rather than a subclass of anything, so this is where
+# the defaults live.
+
+
+def background_of(panel: Any) -> tuple[str, ...]:
+    return tuple(getattr(panel, "background", ()))
+
+
+def suggestions_of(panel: Any) -> tuple[str, ...]:
+    return tuple(getattr(panel, "suggestions", ()))
+
+
+def notes_of(panel: Any, result: Any) -> list[str]:
+    method = getattr(panel, "notes", None)
+    return list(method(result)) if callable(method) else []

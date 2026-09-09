@@ -84,6 +84,40 @@ class BranePanel:
         "stretching outweighs the normal-ordering constant, which the readout locates two "
         "ways.  Distances are in units of sqrt(alpha')."
     )
+    background = (
+        "A D-brane is where an open string can end.  Put N of them on top of each other "
+        "and a string can run from any one to any other, so there are N^2 kinds of open "
+        "string, counting orientation: the ends are labelled (a, b) and (b, a) is a "
+        "different string.  Each supplies a massless vector, and N^2 massless vectors in "
+        "the adjoint is U(N).  The gauge group is not put in -- it is the number of ways "
+        "of choosing two endpoints.",
+        "Move one brane a distance d away and every string with one end on it now has "
+        "to stretch.  Stretching costs energy: a string of tension 1/2 pi alpha' held at "
+        "length d has energy d/2 pi alpha', and that energy appears as mass.  Those "
+        "vectors leave the massless spectrum and U(N) breaks to U(N-1) x U(1).  This is "
+        "the Higgs mechanism, with the brane's position for a Higgs field and the "
+        "stretched string for the gauge boson that ate it.",
+        "The masses add in quadrature: M^2 = (d/2 pi alpha')^2 + (N - 1)/alpha'.  The "
+        "second term is the open bosonic string's usual spectrum, and at level zero it "
+        "is negative -- the tachyon.  Stretching never cancels that sign for free; it "
+        "only outweighs it once d reaches 2 pi sqrt(alpha').",
+        "That tachyon is real and it means the bosonic vacuum here is unstable.  The "
+        "superstring has no level-zero tachyon and the same construction there is "
+        "stable at every separation.  This panel is honest about being bosonic rather "
+        "than quietly dropping the level.",
+    )
+    suggestions = (
+        "Set the separation to zero.  All N^2 vectors are massless and the group is "
+        "U(N); the two counts of them, one by stacks and one by pairs, agree.",
+        "Pull it out slowly.  The group breaks at the first nonzero separation -- there "
+        "is no threshold for the breaking, only for the tachyon -- and the number of "
+        "stretched strings jumps to 2(N-1) at once.",
+        "Cross d = 2 pi sqrt(alpha') = 6.2832.  The N = 0 curve crosses zero exactly at "
+        "the dashed line, and the readout's bisection finds that crossing without "
+        "having been told where it is.",
+        "Raise the number of branes and watch N^2 - (N-1)^2 - 1 = 2(N-1) strings become "
+        "massive each time.",
+    )
     controls = (
         Slider("separation", "separation  d / sqrt(alpha')", 0.0, _SPAN, 2.0, step=0.05),
         Integer("branes", "branes in the stack", 2, 6, 3),
@@ -172,6 +206,53 @@ class BranePanel:
                 "  ".join(f"N={lv.level}: {lv.mass_squared:+.3f}" for lv in result.levels),
             ),
         ]
+
+
+    def notes(self, result: Branes) -> list[str]:
+        """What this stack is doing at this separation."""
+        total = len(result.positions)
+        out: list[str] = []
+        if result.stretched == 0:
+            out.append(
+                f"All {total} branes are together, so every one of the {total}^2 = "
+                f"{result.massless_paired} strings has both ends in the same place and "
+                f"costs nothing to exist.  The gauge group is the full {result.group}."
+            )
+        else:
+            out.append(
+                f"One brane is {result.separation:.3g} away from the other "
+                f"{total - 1}.  The {result.stretched} strings with exactly one end on "
+                f"it have to cross that gap and have picked up mass; the "
+                f"{result.massless_paired} whose ends coincide have not.  "
+                f"{result.group} is what is left, and the count is the same whether you "
+                "group the branes into stacks or walk the pairs one at a time."
+            )
+
+        gap = result.threshold_closed - result.separation
+        if result.tachyonic:
+            out.append(
+                f"The level-0 state is still tachyonic, at alpha' M^2 = "
+                f"{result.levels[0].mass_squared:+.4f}.  It stays that way until the "
+                f"separation reaches 2 pi sqrt(alpha') = {result.threshold_closed:.4f}, "
+                f"another {gap:.3g} out.  The stretching energy is winning but has not "
+                "yet won."
+            )
+        else:
+            out.append(
+                f"Past 2 pi sqrt(alpha') = {result.threshold_closed:.4f} the stretching "
+                f"finally outweighs the normal-ordering constant and the level-0 state "
+                f"is massive, at alpha' M^2 = {result.levels[0].mass_squared:+.4f}.  "
+                "Every level is above zero now, and this configuration is the stable "
+                "one."
+            )
+
+        out.append(
+            "The threshold in that sentence is not quoted.  One route derives "
+            f"2 pi sqrt(alpha') by hand; the other bisects the enumerated level-0 mass "
+            f"and lands on {result.threshold_found:.6f}, having been told only how to "
+            "evaluate a spectrum."
+        )
+        return out
 
 
 def _positions(positions: tuple[float, ...]) -> str:

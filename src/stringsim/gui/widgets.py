@@ -135,7 +135,10 @@ class ControlBar:
 
     def set(self, name: str, value: Any) -> None:
         """Move a control from code, in the units the panel speaks."""
-        control = next(c for c in self._controls if c.name == name)
+        control = next((c for c in self._controls if c.name == name), None)
+        if control is None:
+            known = ", ".join(c.name for c in self._controls) or "none"
+            raise KeyError(f"no control named {name!r}; this panel has {known}")
         forward = _scales(control)[0] if isinstance(control, Slider) else (lambda v: v)
         self._vars[name].set(forward(control.clamp(value)))
 

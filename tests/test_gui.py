@@ -33,15 +33,21 @@ from stringsim.gui.panel import (  # noqa: E402
     Integer,
     Line,
     Slider,
+    background_of,
     check_controls,
     defaults,
+    notes_of,
+    suggestions_of,
 )
 from stringsim.gui.panels.branes import BranePanel  # noqa: E402
+from stringsim.gui.panels.critical import CriticalDimensionPanel  # noqa: E402
 from stringsim.gui.panels.pq import PQPanel  # noqa: E402
 from stringsim.gui.panels.tduality import TDualityPanel  # noqa: E402
 from stringsim.gui.panels.veneziano import VenezianoPanel  # noqa: E402
+from stringsim.quantum.virasoro import lightcone_count  # noqa: E402
 
 TDUALITY = TDualityPanel()
+TDUALITY_IN_REGISTRY = next(p for p in REGISTRY if isinstance(p, TDualityPanel))
 
 
 # --------------------------------------------------------------------------
@@ -337,10 +343,15 @@ def test_the_window_builds_and_every_panel_computes_draws_and_reports(root) -> N
 
 
 def test_moving_a_control_redraws_with_the_new_value(root) -> None:
+    """Selected by title rather than by position, since the order is editorial."""
     from stringsim.gui.app import App
 
     app = App(root)
     try:
+        index = next(
+            i for i, panel in enumerate(app.panels) if panel is TDUALITY_IN_REGISTRY
+        )
+        app._select(index)
         assert app.runner.wait_idle(60.0)
         app._drain()
         first = app._readout.get("1.0", "end")
@@ -596,3 +607,211 @@ def test_the_veneziano_figure_carries_both_sets_of_marks() -> None:
     assert isinstance(figure, Figure)
     assert "off the spectrum" in figure.axes[0].get_title()
     assert plt.get_fignums() == before
+
+
+# --------------------------------------------------------------------------
+# the commentary
+# --------------------------------------------------------------------------
+
+
+def test_every_panel_carries_prose_of_all_three_kinds() -> None:
+    """Static background, things to try, and notes about the current result."""
+    for panel in REGISTRY:
+        assert background_of(panel), panel.title
+        assert suggestions_of(panel), panel.title
+        assert notes_of(panel, panel.compute()), panel.title
+
+
+def test_the_prose_is_paragraphs_rather_than_fragments() -> None:
+    """Each piece is a sentence or more, so the notes read rather than list."""
+    for panel in REGISTRY:
+        for paragraph in (
+            *background_of(panel),
+            *suggestions_of(panel),
+            *notes_of(panel, panel.compute()),
+        ):
+            # No rule about the first character: a paragraph may open with a
+            # charge, "(1, 1) has coprime charges", or with a symbol,
+            # "alpha(t) = 1 is a non-negative integer here".
+            assert len(paragraph) > 60, (panel.title, paragraph)
+            assert paragraph.rstrip().endswith((".", "!", "?")), paragraph
+
+
+def test_the_prose_carries_no_markup_the_window_cannot_render() -> None:
+    """A Tk text widget shows ``*emphasis*`` and backticks literally."""
+    for panel in REGISTRY:
+        for paragraph in (
+            *background_of(panel),
+            *suggestions_of(panel),
+            *notes_of(panel, panel.compute()),
+        ):
+            assert "`" not in paragraph, (panel.title, paragraph)
+            assert "*" not in paragraph, (panel.title, paragraph)
+
+
+def test_a_panel_without_commentary_is_still_a_panel() -> None:
+    """All three pieces are optional, and their absence is not an error."""
+
+    class Bare:
+        title = "bare"
+        blurb = "no commentary at all"
+        controls = ()
+
+    assert background_of(Bare()) == ()
+    assert suggestions_of(Bare()) == ()
+    assert notes_of(Bare(), None) == []
+
+
+def test_the_notes_change_with_the_radius() -> None:
+    """The one part of the commentary a static page could not have written."""
+    at_self_dual = " ".join(TDUALITY.notes(TDUALITY.compute(radius=1.0)))
+    at_half = " ".join(TDUALITY.notes(TDUALITY.compute(radius=0.5)))
+    generic = " ".join(TDUALITY.notes(TDUALITY.compute(radius=1.7)))
+
+    assert "self-dual radius" in at_self_dual and "SU(2)" in at_self_dual
+    assert "not the self-dual radius" in at_half and "tachyon tower" in at_half
+    assert "generic radius" in generic
+    assert at_self_dual != at_half != generic
+
+
+def test_the_notes_name_which_tower_supplies_the_first_excitation() -> None:
+    r"""A momentum mode above :math:`\sqrt{\alpha'}` and a winding mode below."""
+    assert "momentum mode" in " ".join(TDUALITY.notes(TDUALITY.compute(radius=3.0)))
+    assert "winding mode" in " ".join(TDUALITY.notes(TDUALITY.compute(radius=0.4)))
+
+
+def test_the_veneziano_notes_say_what_did_not_break() -> None:
+    """Moving the intercept is meant to be read, not merely seen to go red."""
+    moved = " ".join(VENEZIANO.notes(VENEZIANO.compute(intercept=0.7)))
+    assert "did not break" in moved
+    assert "crossing" in moved
+
+    on_shell = " ".join(
+        VENEZIANO.notes(VENEZIANO.compute(intercept=1.35, mandelstam_t=-0.35))
+    )
+    assert "not a failure" in on_shell
+
+
+def test_the_brane_notes_follow_the_stack_apart() -> None:
+    together = " ".join(BRANES.notes(BRANES.compute(separation=0.0, branes=4)))
+    apart = " ".join(BRANES.notes(BRANES.compute(separation=8.0, branes=4)))
+    assert "All 4 branes are together" in together
+    assert "still tachyonic" in " ".join(BRANES.notes(BRANES.compute(separation=1.0)))
+    assert "stable one" in apart
+
+
+def test_the_pq_notes_follow_the_coupling_across_one() -> None:
+    weak = " ".join(PQ.notes(PQ.compute(coupling=0.2)))
+    strong = " ".join(PQ.notes(PQ.compute(coupling=4.0)))
+    fixed = " ".join(PQ.notes(PQ.compute(coupling=1.0)))
+    assert "weakly coupled" in weak
+    assert "lighter object" in strong
+    assert "fixed point of S" in fixed
+
+
+# --------------------------------------------------------------------------
+# D = 26, from two sides
+# --------------------------------------------------------------------------
+
+CRITICAL = CriticalDimensionPanel()
+
+
+def test_three_routes_to_twenty_six() -> None:
+    """Norms, counting, and a conformal anomaly, with no code in common.
+
+    The first reads the signature of a Gram matrix, the second compares a state
+    count against the light cone's, and the third is ``c = D - 26``.  None of
+    them mentions the others.
+    """
+    result = CRITICAL.compute()
+    assert result.from_norms == 26
+    assert result.from_counting == 26
+    assert result.from_anomaly == 26
+    assert result.bounds_meet
+
+
+def test_the_intercept_comes_from_zeta_rather_than_from_a_formula() -> None:
+    r"""``a = -(D-2)/2 * zeta(-1)`` against ``(D-2)/24``, at ``D = 26``."""
+    result = CRITICAL.compute()
+    assert result.zeta_intercept == pytest.approx(1.0, abs=1e-6)
+    assert result.string_intercept == pytest.approx(1.0)
+    assert result.zeta_intercept == pytest.approx(result.string_intercept, abs=1e-6)
+
+
+def test_the_central_charge_from_two_different_commutators() -> None:
+    r""":math:`[L_2, L_{-2}]` and :math:`[L_3, L_{-3}]` both give ``c = D``."""
+    result = CRITICAL.compute()
+    assert result.measured_c == pytest.approx(26.0)
+    assert result.measured_c_other == pytest.approx(26.0)
+
+
+def test_at_twenty_six_the_survivors_are_the_light_cone_s() -> None:
+    """324 positive, 26 null, none negative -- and 324 is what the light cone has."""
+    result = CRITICAL.compute()
+    here = result.at(26)
+    assert (here.positive, here.zero, here.negative) == (324, 26, 0)
+    assert here.positive == 324 == lightcone_count(2, 26)
+    assert abs(here.smallest) < 1e-9
+
+
+def test_level_one_cannot_see_the_critical_dimension() -> None:
+    """So its two bound lines carry no verdict rather than a failing one.
+
+    Level 1's physical states are the ``D - 1`` polarisations with one null
+    direction, in every dimension.  Nothing there disagrees with 26; nothing
+    there has an opinion about it, and a red mark would claim otherwise.
+    """
+    result = CRITICAL.compute(level=1)
+    assert result.from_norms == 30  # the top of the scan, not a bound
+    assert result.from_counting == 4  # the bottom of it
+    assert not result.bounds_meet
+
+    bounds = [
+        line for line in CRITICAL.readout(result)
+        if line.label in ("largest ghost-free D", "smallest D matching the light cone")
+    ]
+    assert len(bounds) == 2
+    assert all(not line.is_check for line in bounds)
+    assert "level 1" in " ".join(line.check for line in bounds)
+    assert "no upper bound to find" in " ".join(CRITICAL.notes(result))
+
+
+@pytest.mark.parametrize("intercept", [0.9, 1.1])
+def test_moving_the_intercept_parts_the_two_bounds(intercept: float) -> None:
+    r"""``a = 1`` and ``D = 26`` are one statement, so neither survives alone."""
+    result = CRITICAL.compute(intercept=intercept)
+    assert not result.bounds_meet
+    assert result.from_norms != 26 or result.from_counting != 26
+
+    bound = next(
+        line for line in CRITICAL.readout(result) if line.label == "largest ghost-free D"
+    )
+    assert bound.ok is False
+
+
+def test_the_notes_do_not_claim_an_equality_that_has_stopped_holding() -> None:
+    """The prose is conditional where the numbers are.
+
+    At ``a = 0.9`` the surviving count at ``D = 26`` is 349 and the light cone
+    still has 324, and the smallest norm is ``-1.5e-2`` rather than zero.  A
+    paragraph written for the good case would assert both equalities anyway.
+    """
+    good = " ".join(CRITICAL.notes(CRITICAL.compute()))
+    bad = " ".join(CRITICAL.notes(CRITICAL.compute(intercept=0.9)))
+
+    assert "is exactly the light cone's" in good
+    assert "zero to machine precision" in good
+
+    assert "is not the light cone's" in bad
+    assert "not zero and not small" in bad
+    assert "is exactly the light cone's" not in bad
+
+
+def test_setting_a_control_a_panel_does_not_have_says_so(root) -> None:
+    """A bare StopIteration from a generator is not a usable error message."""
+    from stringsim.gui.widgets import ControlBar
+
+    bar = ControlBar(root, TDUALITY.controls, lambda: None)
+    with pytest.raises(KeyError, match="no control named 'coupling'"):
+        bar.set("coupling", 1.0)
+    bar.destroy()

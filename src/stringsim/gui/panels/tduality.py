@@ -64,6 +64,13 @@ class TDuality:
     states: int
     lightest_here: float
     lightest_there: float
+    lightest_state: CircleState | None
+    """The first excitation, kept so the commentary can say what kind it is.
+
+    At large ``R`` it is a momentum mode and at small ``R`` a winding one, and
+    which of the two it is at a given radius is the whole content of T-duality
+    stated as one state rather than as a spectrum.
+    """
     extra_here: tuple[CircleState, ...]
     extra_there: tuple[CircleState, ...]
     grid: np.ndarray
@@ -88,6 +95,38 @@ class TDualityPanel:
         "slider: the whole enumerated spectrum at R is compared with the one at "
         "alpha'/R, and the largest disagreement is printed beside the package's own "
         "verdict on the same question.  Radii are in units of sqrt(alpha')."
+    )
+    background = (
+        "Compactify one direction, X ~ X + 2 pi R.  Two things change at once.  "
+        "Momentum along the circle is quantised, p = n/R, exactly as it is for a point "
+        "particle -- the Kaluza-Klein tower.  But a string can also wrap the circle w "
+        "times, and unwinding it costs energy proportional to the length wrapped, "
+        "w R / alpha'.  A point particle has no such option, and this is the first place "
+        "where a string is visibly not one.",
+        "The closed-string mass is then M^2 = n^2/R^2 + w^2 R^2/alpha'^2 + (2/alpha') "
+        "(N + Ntilde - 2), with level matching N - Ntilde = n w now sourced by momentum "
+        "and winding rather than vanishing.",
+        "Sending R to alpha'/R and n to w exchanges the first two terms and flips the "
+        "sign of n w consistently with N <-> Ntilde, so the whole spectrum comes back "
+        "unchanged.  A circle of radius R and one of radius alpha'/R are the same "
+        "theory.  There is a shortest distinguishable radius, R = sqrt(alpha'), and "
+        "shrinking past it gets you nowhere new -- it walks you back out the other side.",
+        "Nothing here is fitted or asserted.  The panel enumerates every level-matched "
+        "(n, w, N, Ntilde) inside the truncation at both radii, sorts the two lists of "
+        "masses, and subtracts them.",
+    )
+    suggestions = (
+        "Put the radius at 1.  Eight extra massless states appear, four of them "
+        "carrying an oscillator: those four are the gauge bosons that enlarge "
+        "U(1) x U(1) into SU(2) x SU(2).",
+        "Put it at 0.5, then at 2.  Two extra massless states each time, and the "
+        "charges swap from (+-1, 0) to (0, +-1) -- the same states seen through the "
+        "duality.  This is not the self-dual radius and something is massless anyway.",
+        "Drag from one end of the track to the other and watch the lightest massive "
+        "state.  Its mass falls, reaches a minimum at the self-dual radius, and rises "
+        "again; on the way it stops being a momentum mode and becomes a winding one.",
+        "Raise the truncations.  More states are enumerated, the two spectra grow "
+        "together, and the largest disagreement stays at zero.",
     )
     controls = (
         Slider("radius", "radius  R / sqrt(alpha')", 0.25, 4.0, 1.0, step=0.01, log=True),
@@ -126,6 +165,11 @@ class TDualityPanel:
             states=len(here),
             lightest_here=_lightest(masses_here),
             lightest_there=_lightest(masses_there),
+            lightest_state=min(
+                (s for s in here if s.alpha_m2 > _TOL),
+                key=lambda s: s.alpha_m2,
+                default=None,
+            ),
             extra_here=tuple(extra_massless_states(radius, conv, **cut)),
             extra_there=tuple(extra_massless_states(dual, conv, **cut)),
             grid=grid,
@@ -214,6 +258,73 @@ class TDualityPanel:
                 )
             )
         return lines
+
+    def notes(self, result: TDuality) -> list[str]:
+        """What is true at this radius, and not at every radius."""
+        out: list[str] = []
+        if abs(result.radius - result.self_dual) < 1e-6:
+            out.append(
+                "This is the self-dual radius, the fixed point of R -> alpha'/R: the "
+                "circle is its own dual and the two towers cross here.  Eight states "
+                "that are massive at any other radius have come down to zero.  Four of "
+                "them carry an oscillator and are gauge bosons -- they enlarge "
+                "U(1)_L x U(1)_R to SU(2)_L x SU(2)_R, a symmetry that exists at this "
+                "one radius and nowhere else.  The other four are the tachyon tower "
+                "passing through zero mass on its way up."
+            )
+        elif result.extra_here:
+            charges = ", ".join(f"({s.n}, {s.w})" for s in result.extra_here)
+            out.append(
+                f"Something is massless here and it is not the self-dual radius: "
+                f"{len(result.extra_here)} extra states, at charges {charges}.  None of "
+                "them carries an oscillator, so none is a gauge boson -- this is the "
+                "bosonic string's tachyon tower crossing zero, which it does at more "
+                "radii than one.  A readout that announced enhanced symmetry whenever "
+                "something went massless would be wrong here, so it counts instead."
+            )
+        else:
+            out.append(
+                "A generic radius: the only massless states are the ones present at "
+                "every radius -- the graviton, the B field, the dilaton, and the two "
+                "U(1) gauge bosons from the metric and the B field with one leg on the "
+                "circle.  Nothing extra."
+            )
+
+        out.append(
+            f"The lightest massive state is {_kind(result.lightest_state)}, at "
+            f"alpha' M^2 = {result.lightest_here:.4f}.  "
+            + (
+                "Above the self-dual radius momentum is cheap and winding is not, so "
+                "the first excitation is a momentum mode."
+                if result.radius > result.self_dual + 1e-9
+                else "Below the self-dual radius the circle is small, momentum costs "
+                "1/R and winding costs R/alpha', so the first excitation is a winding "
+                "mode instead."
+                if result.radius < result.self_dual - 1e-9
+                else "At the fixed point the two cost the same, which is what makes it "
+                "the fixed point."
+            )
+        )
+        out.append(
+            f"The dual radius alpha'/R = {result.dual_radius:.4f} is a different "
+            f"circle with the same physics.  Both spectra have {result.states} states "
+            "in this truncation, and sorted by mass they agree to "
+            f"{result.residual:.1e} -- state by state, not merely in total."
+        )
+        return out
+
+
+def _kind(state: CircleState | None) -> str:
+    """What sort of excitation the lightest massive state is."""
+    if state is None:
+        return "nothing above zero mass in this truncation"
+    if state.n and not state.w:
+        return f"a momentum mode, (n, w) = ({state.n}, {state.w})"
+    if state.w and not state.n:
+        return f"a winding mode, (n, w) = ({state.n}, {state.w})"
+    if state.n and state.w:
+        return f"carrying both, (n, w) = ({state.n}, {state.w})"
+    return "an oscillator state with no momentum and no winding"
 
 
 def _lightest(masses: list[float]) -> float:

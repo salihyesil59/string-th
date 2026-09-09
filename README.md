@@ -26,7 +26,7 @@ is where those cross-checks live.
 python -m stringsim                       # summary of everything, in one screen
 python -m stringsim --gui                 # the same, with the parameters live
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 1397 checks
+python -m pytest                          # 1415 checks
 ```
 
 ---
@@ -2153,6 +2153,7 @@ the package already had and which decides the question its own way.
 
 | panel | what moves | the two routes |
 |---|---|---|
+| `D = 26`, from two sides | the intercept `a`, the level | a Gram signature, a state count, and `c = D - 26` |
 | T-duality on a circle | `R`, and the truncations | the sorted spectra subtracted, vs `spectrum_is_t_dual` |
 | D-branes pulled apart | the separation, the stack | `sum n_i^2` vs a walk over ordered pairs; `2 pi sqrt(alpha')` vs a bisection |
 | `(p,q)` strings | `g_s`, `C_0`, the charges | ten dimensions vs eleven; `SL(2,Z)` on the tension; a junction's net force |
@@ -2192,6 +2193,37 @@ momentum transfer with `alpha(t)` a non-negative integer puts `A` on a
 rather than reporting `nan` as an error. Both configurations are reachable from
 the sliders, which is why they are handled rather than avoided.
 
+**A second check is meant to be seen failing, and it is the same lesson.** The
+`D = 26` panel puts three routes to the critical dimension side by side: the
+signature of a Gram matrix (an upper bound — past 26 a physical state has
+negative norm), a state count against the light cone's (a lower bound — below 26
+the covariant construction has one state too many), and `c = D - 26`, which has
+neither a matrix nor a count in it. Move the intercept `a` off 1 and all three
+stop agreeing, because `a = (D-2)/24` is 1 exactly when `D` is 26: they were
+never two facts.
+
+#### Reading it, not only operating it
+
+Sliders without prose are a control surface. Each panel therefore carries three
+kinds of writing, shown in the window's second tab:
+
+- **what is happening here** — recomputed with the result, and the only part a
+  static page could not have written. At the self-dual radius it says which
+  four states became gauge bosons; at `R = 1/2` it says the massless states
+  found there are the tachyon tower instead, and that a readout announcing
+  enhanced symmetry would have been wrong; at `a = 0.9` it says the surviving
+  count is 349 and *not* the light cone's 324.
+- **background** — where the physics comes from, in a few paragraphs. Why a
+  string can wind and a particle cannot; why `N^2` massless vectors is `U(N)`;
+  why an amplitude with finitely many resonances cannot be soft at high energy.
+- **things to try** — the settings worth visiting, and what to watch when you
+  get there.
+
+The dynamic part is written conditionally wherever the numbers are. A paragraph
+that says "what is left is exactly the light cone's 324" is only produced when
+it is; otherwise it says the constraints have stopped removing the right states.
+That is the same discipline as the readout's verdicts, applied to sentences.
+
 #### How it is built
 
 Zero new dependencies: tkinter is in the standard library and matplotlib was
@@ -2214,9 +2246,9 @@ def readout(self, result) -> list[Line]  # the numbers, and the checks on them
 
 `Control` is a dataclass, so `app.py` builds the widgets and no panel imports
 tkinter. That is what lets the physics be tested the way everything else here is
-tested — 89 of this module's 94 tests need no display at all, and one of them
+tested — 106 of this module's 112 tests need no display at all, and one of them
 blocks the `tkinter` import outright and checks that the panels still load. The
-remaining five build a window, walk the registry, and let each panel compute,
+remaining six build a window, walk the registry, and let each panel compute,
 draw and report; they skip where there is no display, and none of them asserts
 anything about how the window looks.
 
@@ -2234,7 +2266,7 @@ adding a sixth box to a legend already sitting on the curves.
 
 #### What is not there yet
 
-Four panels of a possible fifteen or so. The registry is a tuple and the app
+Five panels of a possible fifteen or so. The registry is a tuple and the app
 reads everything off it, so adding one is a module and a line — but which of the
 29 examples make good panels is a decision per example, and the ones that print
 a table are better as scripts. The animations are not in it either: the
@@ -2288,7 +2320,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-1397 checks.  Two minutes on a quiet machine and six on a busy one -- the
+1415 checks.  Two minutes on a quiet machine and six on a busy one -- the
 same suite has been timed at both, so the number is not quoted. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:

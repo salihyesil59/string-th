@@ -24,7 +24,14 @@ import traceback
 from tkinter import ttk
 from typing import Any
 
-from .panel import Line, Panel, check_controls
+from .panel import (
+    Line,
+    Panel,
+    background_of,
+    check_controls,
+    notes_of,
+    suggestions_of,
+)
 from .panels import REGISTRY
 from .runner import Runner
 from .widgets import ControlBar
@@ -111,13 +118,33 @@ class App:
         split.add(self._plot, weight=1)
         split.add(lower, weight=0)
 
-        readout_box = ttk.Frame(lower)
-        readout_box.pack(side="bottom", fill="x")
+        # Two views of the same result, side by side in the same space: the
+        # numbers, and what they mean here.  Tabs rather than a second column
+        # because the readout's lines are long and a figure wants the width.
+        tabs = ttk.Notebook(lower)
+        tabs.pack(side="bottom", fill="x")
+
+        readout_box = ttk.Frame(tabs)
         self._readout = tk.Text(readout_box, height=9, wrap="none", font=_fixed(), relief="flat")
         scroll = ttk.Scrollbar(readout_box, orient="horizontal", command=self._readout.xview)
         self._readout.configure(xscrollcommand=scroll.set)
         scroll.pack(side="bottom", fill="x")
-        self._readout.pack(side="bottom", fill="x")
+        self._readout.pack(side="bottom", fill="both", expand=True)
+        tabs.add(readout_box, text="  numbers  ")
+
+        notes_box = ttk.Frame(tabs)
+        self._notes = tk.Text(
+            notes_box, height=9, wrap="word", relief="flat", padx=8, pady=6, spacing3=4
+        )
+        notes_scroll = ttk.Scrollbar(notes_box, orient="vertical", command=self._notes.yview)
+        self._notes.configure(yscrollcommand=notes_scroll.set)
+        notes_scroll.pack(side="right", fill="y")
+        self._notes.pack(side="left", fill="both", expand=True)
+        tabs.add(notes_box, text="  what this means  ")
+
+        self._notes.tag_configure("heading", foreground="#444444", spacing1=8, spacing3=3)
+        self._notes.tag_configure("now", foreground="#1a4d7f")
+        self._notes.configure(state="disabled")
 
         self._status = ttk.Label(lower, text="", anchor="w")
         self._status.pack(side="bottom", fill="x", pady=(4, 2))
@@ -191,6 +218,7 @@ class App:
             return
         self._show_figure(figure)
         self._write(lines)
+        self._write_notes(panel, result)
         failed = sum(1 for line in lines if line.ok is False)
         checks = sum(1 for line in lines if line.is_check)
         self._status.configure(
@@ -226,6 +254,30 @@ class App:
                 self._readout.insert("end", f"  {line.verdict()}", "ok" if line.ok else "bad")
             self._readout.insert("end", "\n")
         self._readout.configure(state="disabled")
+
+    def _write_notes(self, panel: Panel, result: Any) -> None:
+        """The prose: what is true here, where it comes from, what to try next.
+
+        The first section is recomputed with the result and the other two are
+        not, which is the whole distinction -- a sentence that holds only at the
+        self-dual radius belongs above one that holds always.
+        """
+        sections = (
+            ("what is happening here", notes_of(panel, result), "now"),
+            ("background", list(background_of(panel)), ""),
+            ("things to try", list(suggestions_of(panel)), ""),
+        )
+        self._notes.configure(state="normal")
+        self._notes.delete("1.0", "end")
+        for heading, paragraphs, tag in sections:
+            if not paragraphs:
+                continue
+            self._notes.insert("end", f"{heading.upper()}\n", "heading")
+            for paragraph in paragraphs:
+                self._notes.insert("end", f"{paragraph}\n\n", tag)
+        if self._notes.get("1.0", "end").strip() == "":
+            self._notes.insert("end", "This panel carries no commentary yet.")
+        self._notes.configure(state="disabled")
 
     def _show_failure(self, exc: BaseException) -> None:
         self._status.configure(text=f"{type(exc).__name__}: {exc}")
