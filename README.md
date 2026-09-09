@@ -26,7 +26,7 @@ is where those cross-checks live.
 python -m stringsim                       # summary of everything, in one screen
 python -m stringsim --gui                 # the same, with the parameters live
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 1519 checks
+python -m pytest                          # 1529 checks
 ```
 
 ---
@@ -2157,6 +2157,7 @@ the package already had and which decides the question its own way.
 | The Hagedorn temperature | levels counted, species `c` | counted partitions vs Cardy's `2 pi sqrt(c/6)` |
 | T-duality on a circle | `R`, and the truncations | the sorted spectra subtracted, vs `spectrum_is_t_dual` |
 | Orbifold fixed points | the quotient, the sector | `|det(1 - theta^k)|` vs an enumeration; `a_k` in closed form vs a measured `zeta(-1, phi)` |
+| Anomaly cancellation | how far the scan looks | 496 from a twelve-form vs 480 roots + rank 16 |
 | D-branes pulled apart | the separation, the stack | `sum n_i^2` vs a walk over ordered pairs; `2 pi sqrt(alpha')` vs a bisection |
 | A string ending on a brane | strings `n`, dimension `p`, slope | flux at three radii; an integrated energy vs `n/2 pi alpha'`; `dL/dE` vs `grad X` |
 | The Myers effect | `N`, the background flux | a matrix minimum vs a wrapped D2; `Tr J^2` vs `1 - 1/N^2` |
@@ -2191,7 +2192,7 @@ walked off the spectrum. The readout says which of those is which.
 
 **Some lines decline to claim what is not true.** A red mark should mean "these
 two routes disagree", not "you have moved a control somewhere the comparison
-does not apply". Five places in the panels drop their verdict instead of
+does not apply". Six places in the panels drop their verdict instead of
 failing, and each is reachable from the sliders:
 
 - `T_{0,1}` equals `dp_brane_tension(1, g_s)` only when the axion vanishes,
@@ -2205,6 +2206,10 @@ failing, and each is reachable from the sliders:
 - The fitted Hagedorn slope is not supposed to equal `2 pi sqrt(c/6)` at a
   finite truncation — it approaches it — so the verdict sits on whether the gap
   *closed*, not on whether it is small.
+- The anomaly scan finds `SO(32)` only if it is told to look as far as
+  `N = 32`, and `E_8 x E_8` only if two factors are allowed. Narrow the window
+  and the survivors line drops its verdict and names what is out of reach,
+  rather than reporting a failure of ten dimensions.
 - Batyrev's Euler characteristic is checked against `int c_3` for the quintic
   and for nothing else. That formula is for a smooth hypersurface in *ordinary*
   projective space, where Calabi-Yau forces degree = `n + 1`; the weighted
@@ -2266,7 +2271,7 @@ def readout(self, result) -> list[Line]  # the numbers, and the checks on them
 
 `Control` is a dataclass, so `app.py` builds the widgets and no panel imports
 tkinter. That is what lets the physics be tested the way everything else here is
-tested — 210 of this module's 216 tests need no display at all, and one of them
+tested — 220 of this module's 226 tests need no display at all, and one of them
 blocks the `tkinter` import outright and checks that the panels still load. The
 remaining six build a window, walk the registry, and let each panel compute,
 draw and report; they skip where there is no display, and none of them asserts
@@ -2286,14 +2291,14 @@ adding a sixth box to a legend already sitting on the curves.
 
 #### What is not there yet
 
-Ten panels carrying 36 checks between them, all recomputed as the controls
+Eleven panels carrying 41 checks between them, all recomputed as the controls
 move. The registry is a tuple and the app reads everything off it, so adding
 another is a module and a line — but which of the 29 examples make good panels
 is a decision per example, and the ones that print a table are better left as
-scripts. The heavier subjects are not in yet either: the `(D, a)` plane, the
-819-group anomaly scan, the Narain theta series and the Cardy fit all take
-seconds rather than milliseconds, which the worker thread is there for but
-which needs the panels written. The animations are not in it either: the
+scripts. Some heavier subjects are still out: the `(D, a)` plane costs about an eighth
+of a second per grid cell, and the Narain theta series and the Cardy fit are
+seconds rather than milliseconds. The worker thread is there for exactly that,
+but the panels have to be written. The animations are not in it either: the
 `animate_*` functions build their own figure before the animation exists, so the
 `path=None` seam does not reach them, and playing one live is a different
 problem from redrawing a figure.
@@ -2344,7 +2349,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-1519 checks.  Two minutes on a quiet machine and six on a busy one -- the
+1529 checks.  Two minutes on a quiet machine and six on a busy one -- the
 same suite has been timed at both, so the number is not quoted. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:
