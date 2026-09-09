@@ -15,6 +15,7 @@ here asserts anything about how the window *looks*.
 from __future__ import annotations
 
 import importlib
+import math
 import sys
 import threading
 import time
@@ -35,7 +36,10 @@ from stringsim.gui.panel import (  # noqa: E402
     check_controls,
     defaults,
 )
+from stringsim.gui.panels.branes import BranePanel  # noqa: E402
+from stringsim.gui.panels.pq import PQPanel  # noqa: E402
 from stringsim.gui.panels.tduality import TDualityPanel  # noqa: E402
+from stringsim.gui.panels.veneziano import VenezianoPanel  # noqa: E402
 
 TDUALITY = TDualityPanel()
 
@@ -277,13 +281,31 @@ def test_the_panel_draws_the_package_s_own_figure_with_the_radii_marked() -> Non
 # --------------------------------------------------------------------------
 
 
-@pytest.fixture
-def root():
+@pytest.fixture(scope="module")
+def interpreter():
+    """One Tcl interpreter for the whole file.
+
+    Starting and stopping a ``Tk()`` per test fails intermittently on Windows
+    with a "usable init.tcl" error -- which the fixture below would report as
+    though there were no display, turning a real test into one that sometimes
+    silently does not run.  Starting the interpreter once removes that.
+    """
     tk = pytest.importorskip("tkinter")
     try:
         window = tk.Tk()
     except tk.TclError as exc:  # pragma: no cover - depends on the machine
-        pytest.skip(f"no display: {exc}")
+        pytest.skip(f"tkinter could not start a window: {exc}")
+    window.withdraw()
+    yield window
+    window.destroy()
+
+
+@pytest.fixture
+def root(interpreter):
+    """A fresh, empty window per test, over that one interpreter."""
+    import tkinter as tk
+
+    window = tk.Toplevel(interpreter)
     window.withdraw()
     yield window
     window.destroy()
@@ -389,3 +411,188 @@ def test_a_logarithmic_slider_is_symmetric_about_the_self_dual_radius(root) -> N
 
     assert positions[1.0] == pytest.approx((positions[0.5] + positions[2.0]) / 2)
     bar.destroy()
+
+
+# --------------------------------------------------------------------------
+# D-branes pulled apart
+# --------------------------------------------------------------------------
+
+BRANES = BranePanel()
+
+
+def test_coincident_branes_carry_u_of_n() -> None:
+    """``N^2`` massless vectors, counted by grouping and by walking pairs."""
+    result = BRANES.compute(separation=0.0, branes=4)
+    assert result.group == "U(4)"
+    assert result.massless_grouped == result.massless_paired == 16
+    assert result.stretched == 0
+
+
+def test_pulling_one_away_breaks_the_group() -> None:
+    r""":math:`U(4) \to U(3) \times U(1)`, and ten vectors survive."""
+    result = BRANES.compute(separation=3.0, branes=4)
+    assert result.group == "U(3) x U(1)"
+    assert result.massless_grouped == result.massless_paired == 3**2 + 1**2
+    assert result.stretched == 16 - 10
+
+
+@pytest.mark.parametrize("branes", [2, 3, 5])
+@pytest.mark.parametrize("separation", [0.0, 1.5, 9.0])
+def test_the_two_counts_of_massless_vectors_always_agree(branes, separation) -> None:
+    """One sums squares over stacks; the other asks every ordered pair."""
+    result = BRANES.compute(separation=separation, branes=branes)
+    assert result.massless_grouped == result.massless_paired
+
+
+def test_the_tachyon_survives_until_two_pi_root_alpha_prime() -> None:
+    r"""The closed form against a bisection that knows no closed form.
+
+    ``stretched_spectrum`` returns numbers.  Bisecting its level-0 mass finds
+    the crossing without ever being told where it is, and
+    :func:`~stringsim.branes.dbrane.tachyon_free_separation` derives it by hand.
+    """
+    result = BRANES.compute(separation=1.0)
+    assert result.threshold_closed == pytest.approx(2 * math.pi)
+    assert result.threshold_found == pytest.approx(result.threshold_closed, abs=1e-9)
+    assert result.tachyonic
+    assert not BRANES.compute(separation=7.0).tachyonic
+
+
+def test_the_brane_readout_agrees_with_itself() -> None:
+    lines = BRANES.readout(BRANES.compute(separation=2.5, branes=3))
+    checks = [line for line in lines if line.is_check]
+    assert len(checks) >= 2
+    assert all(line.ok for line in checks)
+
+
+# --------------------------------------------------------------------------
+# (p,q) strings
+# --------------------------------------------------------------------------
+
+PQ = PQPanel()
+
+
+@pytest.mark.parametrize(("p", "q"), [(1, 0), (0, 1), (1, 1), (2, -3), (-1, 2)])
+@pytest.mark.parametrize("coupling", [0.05, 0.5, 1.0, 3.7])
+def test_the_tension_from_ten_dimensions_and_from_eleven(p, q, coupling) -> None:
+    """One evaluates ``|p + q tau| / 2 pi alpha'``; the other wraps an M2-brane."""
+    result = PQ.compute(coupling=coupling, p=p, q=q)
+    assert result.membrane_residual < 1e-12
+    assert result.tension == pytest.approx(result.membrane)
+
+
+@pytest.mark.parametrize(("p", "q"), [(1, 0), (0, 1), (3, 2)])
+def test_sl2z_moves_the_charges_and_leaves_the_tension(p, q) -> None:
+    result = PQ.compute(coupling=0.7, axion=0.3, p=p, q=q)
+    assert result.s_residual < 1e-12
+    assert result.t_residual < 1e-12
+
+
+def test_s_exchanges_the_fundamental_string_and_the_d1() -> None:
+    assert PQ.compute(p=1, q=0).s_charges == (0, 1)
+    assert PQ.compute(p=0, q=1).s_charges == (-1, 0)
+
+
+@pytest.mark.parametrize("coupling", [0.2, 1.0, 4.0])
+def test_the_junction_balances_because_the_charges_do(coupling) -> None:
+    """No angle is imposed anywhere; the net force is what comes out."""
+    result = PQ.compute(coupling=coupling, axion=0.25)
+    assert result.junction_charge == (0, 0)
+    assert result.junction_force < 1e-12
+
+
+def test_the_d1_matches_dp_brane_tension_only_without_an_axion() -> None:
+    r"""``|tau| = 1/g_s`` when ``C_0 = 0`` and not otherwise, and the panel says so."""
+    zero = PQ.compute(coupling=0.4, axion=0.0)
+    assert zero.axion_is_zero
+    assert zero.d1_residual < 1e-12
+    assert zero.d1_tension == pytest.approx(zero.d1_from_dbrane)
+
+    tilted = PQ.compute(coupling=0.4, axion=0.5)
+    assert not tilted.axion_is_zero
+    assert tilted.d1_residual > 1e-3
+    # The line for it carries no verdict rather than a failing one, because the
+    # equality was never claimed away from C_0 = 0.
+    line = PQ.readout(tilted)[-1]
+    assert not line.is_check and "only at C_0 = 0" in line.value
+
+
+def test_a_charge_with_a_common_factor_sits_at_threshold() -> None:
+    """``(2,2)`` is two ``(1,1)`` strings, so nothing is gained by binding."""
+    single = PQ.compute(p=1, q=1)
+    doubled = PQ.compute(p=2, q=2)
+    assert single.primitive and not doubled.primitive
+    assert single.binding > 0.0
+    assert doubled.binding == pytest.approx(0.0, abs=1e-12)
+
+
+def test_a_string_needs_a_charge() -> None:
+    with pytest.raises(ValueError, match="not a string"):
+        PQ.compute(p=0, q=0)
+
+
+# --------------------------------------------------------------------------
+# the Veneziano amplitude
+# --------------------------------------------------------------------------
+
+VENEZIANO = VenezianoPanel()
+
+
+def test_the_poles_sit_on_the_mass_levels_at_the_string_s_intercept() -> None:
+    r"""Two modules, no shared code, and the same list of numbers.
+
+    The amplitude's poles come from where a gamma function's argument reaches a
+    non-positive integer; the levels come from ``alpha' M^2 = N - (D-2)/24``.
+    """
+    result = VENEZIANO.compute(intercept=1.0)
+    assert result.string_intercept == pytest.approx(1.0)
+    assert result.pole_offset < 1e-12
+    assert list(result.poles) == pytest.approx(list(result.levels))
+
+
+@pytest.mark.parametrize("intercept", [0.55, 0.8, 1.2, 1.45])
+def test_moving_the_intercept_parts_them_by_exactly_the_shift(intercept) -> None:
+    """And the amplitude itself is untouched -- which is the point of the panel."""
+    result = VENEZIANO.compute(intercept=intercept)
+    assert result.pole_offset == pytest.approx(abs(1.0 - intercept))
+    assert result.crossing < 1e-12
+    check = next(
+        line for line in VENEZIANO.readout(result) if "poles against" in line.label
+    )
+    assert check.ok is False
+
+
+@pytest.mark.parametrize("intercept", [0.55, 1.0, 1.2])
+@pytest.mark.parametrize("mandelstam_t", [-0.35, -1.4, -2.6])
+def test_the_residues_from_a_limit_and_from_the_closed_form(intercept, mandelstam_t) -> None:
+    r"""A two-sided numerical limit against ``-prod (alpha_t + k) / n!``."""
+    result = VENEZIANO.compute(intercept=intercept, mandelstam_t=mandelstam_t)
+    if result.t_on_shell:  # pragma: no cover - only for special (a, t) pairs
+        pytest.skip("alpha(t) is an integer here, so A is singular for every s")
+    assert result.residues
+    assert result.residue_error < 1e-6
+
+
+def test_a_momentum_transfer_on_a_resonance_is_named_rather_than_failed() -> None:
+    r"""``alpha(t) = 1`` at ``a = 1.35``, ``alpha' t = -0.35``: reachable from the sliders.
+
+    ``A`` is then singular at every ``s`` and the residue limit has nothing to
+    converge to.  That is a fact about the configuration rather than a failure,
+    so the line carries no verdict and says which fact it is.
+    """
+    result = VENEZIANO.compute(intercept=1.35, mandelstam_t=-0.35)
+    assert result.t_on_shell
+    assert result.residues == ()
+    line = next(line for line in VENEZIANO.readout(result) if line.label == "residues")
+    assert not line.is_check
+    assert "non-negative integer" in line.check
+
+
+def test_the_veneziano_figure_carries_both_sets_of_marks() -> None:
+    import matplotlib.pyplot as plt
+
+    before = plt.get_fignums()
+    figure = VENEZIANO.draw(VENEZIANO.compute(intercept=0.8))
+    assert isinstance(figure, Figure)
+    assert "off the spectrum" in figure.axes[0].get_title()
+    assert plt.get_fignums() == before

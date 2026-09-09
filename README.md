@@ -26,7 +26,7 @@ is where those cross-checks live.
 python -m stringsim                       # summary of everything, in one screen
 python -m stringsim --gui                 # the same, with the parameters live
 python examples/01_vibrating_string.py    # animations + constraint residuals
-python -m pytest                          # 1338 checks
+python -m pytest                          # 1397 checks
 ```
 
 ---
@@ -2149,19 +2149,48 @@ Those two columns come from code that shares nothing. The left one sorts both
 enumerated spectra and subtracts; the right one is `spectrum_is_t_dual`, which
 the package already had and which decides the question its own way.
 
-**The slider is logarithmic, and that is not decoration.** Under `R -> alpha'/R`
-a radius and its dual are reflections of each other, and on a linear track they
-are not: over `[1/4, 4]` the fixed point would sit a fifth of the way along. In
-the exponent it sits in the middle and the two dual radii are equidistant from
-it, which is the symmetry the panel is about.
+#### The panels
 
-**What the panel found rather than was told.** The obvious reading of the circle
+| panel | what moves | the two routes |
+|---|---|---|
+| T-duality on a circle | `R`, and the truncations | the sorted spectra subtracted, vs `spectrum_is_t_dual` |
+| D-branes pulled apart | the separation, the stack | `sum n_i^2` vs a walk over ordered pairs; `2 pi sqrt(alpha')` vs a bisection |
+| `(p,q)` strings | `g_s`, `C_0`, the charges | ten dimensions vs eleven; `SL(2,Z)` on the tension; a junction's net force |
+| The Veneziano amplitude | the Regge intercept, `t` | the poles vs the mass levels; a residue limit vs its closed form |
+
+**The slider is logarithmic where ratios are what matter.** Under
+`R -> alpha'/R` a radius and its dual are reflections of each other, and on a
+linear track they are not: over `[1/4, 4]` the fixed point would sit a fifth of
+the way along. In the exponent it sits in the middle and the two dual radii are
+equidistant from it. The same for the string coupling under `S`.
+
+**What a panel found rather than was told.** The obvious reading of the circle
 is that extra massless states appear at the self-dual radius and nowhere else,
-and a readout asserting that would have been wrong. At `R = 1/2` two more appear
-— `(n, w) = (±1, 0)`, the tachyon tower crossing zero through momentum — and at
-`R = 2` their T-dual images `(0, ±1)`. Neither carries an oscillator, so neither
-is a gauge boson; only the four at the self-dual radius are. The panel counts
-what is there and reports the count.
+and a readout asserting that would have been wrong. At `R = 1/2` two more
+appear — `(n, w) = (±1, 0)`, the tachyon tower crossing zero through momentum —
+and at `R = 2` their T-dual images `(0, ±1)`. Neither carries an oscillator, so
+neither is a gauge boson; only the four at the self-dual radius are. The panel
+counts what is there and reports the count.
+
+**One check is meant to be seen failing.** The Veneziano amplitude has poles
+where `alpha(s) = a + alpha' s` reaches a non-negative integer; the open
+string's states sit at `alpha' M^2 = N - a` with the same `a`, for the
+unrelated reason that it is the normal-ordering constant `(D-2)/24`. Nothing in
+`amplitudes/veneziano.py` knows about the spectrum and nothing in
+`quantum/spectrum.py` knows about gamma functions, so their agreeing is a
+statement and not a definition — and moving the intercept off 1 breaks it while
+leaving the amplitude untouched. The residues still match their closed form,
+crossing symmetry still holds to machine precision, and the poles have simply
+walked off the spectrum. The readout says which of those is which.
+
+**Two lines decline to claim what is not true.** `T_{0,1}` equals
+`dp_brane_tension(1, g_s)` only when the axion vanishes, because `|tau| = 1/g_s`
+only there; away from `C_0 = 0` that line drops its verdict and prints both
+numbers instead of reporting a failure of something never claimed. Likewise a
+momentum transfer with `alpha(t)` a non-negative integer puts `A` on a
+`t`-channel resonance, singular at every `s`, and the residue line says so
+rather than reporting `nan` as an error. Both configurations are reachable from
+the sliders, which is why they are handled rather than avoided.
 
 #### How it is built
 
@@ -2185,9 +2214,9 @@ def readout(self, result) -> list[Line]  # the numbers, and the checks on them
 
 `Control` is a dataclass, so `app.py` builds the widgets and no panel imports
 tkinter. That is what lets the physics be tested the way everything else here is
-tested — 30 of this module's tests need no display at all, and one of them
-blocks the `tkinter` import outright and checks that the panels still load.
-The remaining few build a window, walk the registry, and let each panel compute,
+tested — 89 of this module's 94 tests need no display at all, and one of them
+blocks the `tkinter` import outright and checks that the panels still load. The
+remaining five build a window, walk the registry, and let each panel compute,
 draw and report; they skip where there is no display, and none of them asserts
 anything about how the window looks.
 
@@ -2198,22 +2227,20 @@ slider forty times computes once and not forty times; a job already running
 cannot be interrupted, so it finishes and its answer is dropped. Nothing crosses
 threads except through a queue.
 
-The three adjustments the panel makes to the shared figure are all about shape
-rather than physics. A log axis labels every minor tick, legible in a
-seven-inch file and a smear in a wide short canvas, so the ticks are named at
-the radii the panel actually visits. The two markers are labelled on the axes
-rather than in the legend, which says which line is which where the line is and
-keeps the legend to one row. And that row goes in the wedge under the crossing,
-the only part of these axes no curve ever reaches.
+Each panel adjusts the shared figure for shape and not for physics: a log axis
+labels every minor tick, which is legible in a seven-inch file and a smear in a
+wide short canvas, and a vertical marker says what it is on the axes rather than
+adding a sixth box to a legend already sitting on the curves.
 
 #### What is not there yet
 
-One panel. The registry is a tuple and the app reads everything off it, so
-adding the next is a module and a line — but the choice of which of the 29
-examples make good panels is a decision per example, not a batch. The animations
-are not in it either: the `animate_*` functions build their own figure before
-the animation exists, so the `path=None` seam does not reach them, and playing
-one live is a different problem from redrawing a figure.
+Four panels of a possible fifteen or so. The registry is a tuple and the app
+reads everything off it, so adding one is a module and a line — but which of the
+29 examples make good panels is a decision per example, and the ones that print
+a table are better as scripts. The animations are not in it either: the
+`animate_*` functions build their own figure before the animation exists, so the
+`path=None` seam does not reach them, and playing one live is a different
+problem from redrawing a figure.
 
 ---
 
@@ -2261,7 +2288,7 @@ Each prints its numbers and writes its figures into `figures/`.
 python -m pytest
 ```
 
-1338 checks.  Two minutes on a quiet machine and six on a busy one -- the
+1397 checks.  Two minutes on a quiet machine and six on a busy one -- the
 same suite has been timed at both, so the number is not quoted. They are cross-checks rather than regression
 snapshots — the value of a test here is that it would fail if the physics were
 wrong, not merely if the code changed. A representative sample:

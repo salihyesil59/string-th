@@ -95,10 +95,23 @@ class App:
             lambda event: self._blurb.configure(wraplength=max(320, event.width - 30)),
         )
 
-        # Packed from the bottom upwards, so that the plot -- the only thing
-        # here that should grow -- is the last to claim space and takes what is
-        # left rather than squeezing the readout off the window.
-        readout_box = ttk.Frame(right)
+        # A draggable split, because how much room a figure needs is a property
+        # of the figure: one pair of axes is legible in a wide short strip and
+        # two side by side are not, and no fixed division suits both.  The
+        # panes below are packed from the bottom upwards so the readout keeps
+        # its height rather than being squeezed off the window.
+        split = ttk.PanedWindow(right, orient="vertical")
+        split.pack(fill="both", expand=True)
+
+        self._plot = ttk.Frame(split)
+        lower = ttk.Frame(split)
+        # All spare height goes to the figure and none to the controls, which
+        # need exactly as much as they need.  With any weight at all on the
+        # lower pane the surplus lands under the readout as blank grey.
+        split.add(self._plot, weight=1)
+        split.add(lower, weight=0)
+
+        readout_box = ttk.Frame(lower)
         readout_box.pack(side="bottom", fill="x")
         self._readout = tk.Text(readout_box, height=9, wrap="none", font=_fixed(), relief="flat")
         scroll = ttk.Scrollbar(readout_box, orient="horizontal", command=self._readout.xview)
@@ -106,14 +119,11 @@ class App:
         scroll.pack(side="bottom", fill="x")
         self._readout.pack(side="bottom", fill="x")
 
-        self._status = ttk.Label(right, text="", anchor="w")
+        self._status = ttk.Label(lower, text="", anchor="w")
         self._status.pack(side="bottom", fill="x", pady=(4, 2))
 
-        self._control_host = ttk.Frame(right)
+        self._control_host = ttk.Frame(lower)
         self._control_host.pack(side="bottom", fill="x")
-
-        self._plot = ttk.Frame(right)
-        self._plot.pack(side="top", fill="both", expand=True)
 
         self._readout.tag_configure("ok", foreground="#1a7f37")
         self._readout.tag_configure("bad", foreground="#b3261e")

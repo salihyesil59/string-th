@@ -10,8 +10,22 @@ the ideas are worth meeting, the same order the README uses.
 
 from __future__ import annotations
 
+from .branes import BranePanel
+from .pq import PQPanel
 from .tduality import TDualityPanel
+from .veneziano import VenezianoPanel
 
-__all__ = ["REGISTRY", "TDualityPanel"]
+__all__ = [
+    "REGISTRY",
+    "TDualityPanel",
+    "BranePanel",
+    "PQPanel",
+    "VenezianoPanel",
+]
 
-REGISTRY = (TDualityPanel(),)
+REGISTRY = (
+    TDualityPanel(),
+    BranePanel(),
+    PQPanel(),
+    VenezianoPanel(),
+)
