@@ -98,6 +98,45 @@ class VenezianoPanel:
         "Move the intercept off 1 and watch them part -- this is the one panel here whose "
         "check is meant to be seen failing."
     )
+    background = (
+        "Veneziano wrote this function down in 1968 to satisfy a list of demands about "
+        "hadron scattering, before anyone knew what produced it.  The string was found "
+        "afterwards, as the thing whose amplitude this is.  That order matters: the "
+        "spectrum below is not fitted to the amplitude, it was derived separately, and "
+        "the two landing on the same numbers is the reason to believe either.",
+        "A(s,t) = Gamma(-alpha_s) Gamma(-alpha_t) / Gamma(-alpha_s - alpha_t), the Euler "
+        "beta function, with alpha(x) = a + alpha' x.  Gamma has poles at zero and the "
+        "negative integers, so A has a pole wherever alpha(s) reaches a non-negative "
+        "integer: an infinite tower of resonances, one per level, going up forever.  A "
+        "finite number of particles cannot do this.",
+        "The residue at the n-th pole is a polynomial of degree n in alpha(t).  A pole "
+        "in s with a degree-n residue in t means the exchanged states at that level have "
+        "spins up to n and no higher, which is exactly what the spectrum says: level n "
+        "has maximum spin n.  The amplitude is telling you its own particle content.",
+        "A(s,t) = A(t,s): one function serves both channels.  Summing s-channel "
+        "resonances and summing t-channel resonances are not two contributions to be "
+        "added, they are two expansions of the same thing.  That is what 'dual' meant in "
+        "'dual resonance model', and it is why counting a diagram twice would be wrong.",
+        "The intercept a is 1 for the open bosonic string.  It is not a free parameter "
+        "there: a = (D-2)/24 from the zeta-regularised zero-point energy, and D = 26 from "
+        "unitarity, so a = 1 twice over.  The slider makes it free anyway, which is the "
+        "point of the panel.",
+    )
+    suggestions = (
+        "Leave the intercept at 1 first.  The red pole lines and the green triangles "
+        "coincide: the amplitude's singularities and the string's states, from two "
+        "modules that share no code.",
+        "Now drag the intercept.  The poles walk off the mass levels and that check "
+        "turns red -- while the residues still match their closed form and crossing "
+        "symmetry still holds exactly.  The amplitude has not broken; it has stopped "
+        "being this string's amplitude.",
+        "Put the intercept back at 1 and move the momentum transfer instead.  The poles "
+        "do not move -- they never depended on t -- but the residues do, and the curve "
+        "between poles changes shape.",
+        "Set the intercept to 1.35 with alpha' t = -0.35.  alpha(t) is then exactly 1, "
+        "the momentum transfer is itself sitting on a resonance, and the amplitude is "
+        "singular for every s.  The residue line says so instead of reporting nan.",
+    )
     controls = (
         Slider("intercept", "Regge intercept  a", 0.2, 1.8, 1.0, step=0.01),
         Slider("mandelstam_t", "momentum transfer  alpha' t", -3.0, -0.05, -0.35, step=0.01),
@@ -248,6 +287,60 @@ class VenezianoPanel:
                 )
             )
         return lines
+
+
+    def notes(self, result: Veneziano) -> list[str]:
+        """Whether the amplitude is still describing the string next door."""
+        out: list[str] = []
+        if result.pole_offset < 1e-9:
+            out.append(
+                "The intercept is the string's own value, so the red lines and the "
+                "green triangles are on top of each other.  That coincidence is the "
+                "content of the panel: the poles were found by asking where a gamma "
+                "function's argument reaches a non-positive integer, and the levels by "
+                "counting oscillator states and subtracting a zero-point energy.  "
+                "Neither calculation has heard of the other."
+            )
+        else:
+            out.append(
+                f"The intercept is {result.intercept:.3g} rather than the string's "
+                f"{result.string_intercept:.3g}, and every pole has slid by "
+                f"{result.pole_offset:.3g}.  Read what did not break.  The residues "
+                "still equal their closed form, and A(s,t) still equals A(t,s) to "
+                "machine precision.  The amplitude is a perfectly good function with "
+                "poles, an infinite tower, and crossing symmetry.  What it no longer is "
+                "is the amplitude of the string whose states are counted in the next "
+                "module.  This is the difference between a formula and a theory."
+            )
+
+        if result.t_on_shell:
+            out.append(
+                f"alpha(t) = {result.intercept + result.mandelstam_t:.3g} is a "
+                "non-negative integer here, so the momentum transfer is itself sitting "
+                "on a t-channel resonance.  Gamma(-alpha_t) is then infinite for every "
+                "s, the plot has nothing finite to draw, and there is no limit for the "
+                "residue check to converge to.  That is a fact about where the sliders "
+                "are, not a failure of anything, so the line reports it rather than "
+                "printing an error."
+            )
+        else:
+            degrees = ", ".join(f"n = {n}" for n, _, _ in result.residues)
+            out.append(
+                f"The residues at {degrees} were each found twice: once by taking "
+                "(alpha(s) - n) A(s,t) numerically from both sides of the pole, and "
+                "once from the closed form -prod(alpha_t + k)/n!.  They agree to "
+                f"{result.residue_error:.1e}.  The n-th is a polynomial of degree n in "
+                "alpha(t), which is the amplitude reporting that level n exchanges "
+                "spins up to n and no more."
+            )
+
+        out.append(
+            f"There are {len(result.poles)} poles drawn, and the tower does not stop -- "
+            "it continues past the edge of the plot forever.  An amplitude with finitely "
+            "many resonances cannot be soft at high energy; this one is, and the price "
+            "is an infinite spectrum.  That price is what a string is."
+        )
+        return out
 
 
 def _limit(n: int, t: float, alpha_prime: float, intercept: float) -> float:

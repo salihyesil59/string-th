@@ -104,6 +104,46 @@ class PQPanel:
         "strings meeting at a point, each leaving along the phase of p + q tau -- no angle "
         "is chosen, and the junction balances because the charges add to zero."
     )
+    background = (
+        "Type IIB has two two-form potentials: the one every string couples to, and one "
+        "from the Ramond-Ramond sector that a D1-brane couples to instead.  A string can "
+        "carry both charges, p units of the first and q of the second, and (1, 0) is the "
+        "fundamental string while (0, 1) is the D1.  They are not two kinds of object "
+        "but two members of one lattice.",
+        "The coupling and the axion sit in one complex number, tau = C_0 + i/g_s, and "
+        "the tension of a (p,q) string is |p + q tau| / 2 pi alpha'.  At weak coupling "
+        "the D1 is heavy, at strong coupling it is light, and at g_s = 1 the two weigh "
+        "the same -- which is the fixed point of the transformation that exchanges them.",
+        "SL(2,Z) acts on tau by tau -> (a tau + b)/(c tau + d) and on (p, q) as a "
+        "doublet.  The Einstein-frame tension is invariant under it.  How the charges "
+        "have to transform is not chosen to make that work: it is read off the algebra, "
+        "which is why the residual printed beside it is a check.",
+        "The same tensions come out of eleven dimensions.  Type IIB on a circle is "
+        "M-theory on a torus, and a (p,q) string is a single M2-brane wrapping the "
+        "(p, q) cycle of that torus.  One route multiplies a membrane tension by a "
+        "cycle length; the other evaluates |p + q tau|/2 pi alpha'.  They share nothing "
+        "but string theory.",
+        "A BPS (p,q) string cannot point wherever it likes: it must run along the phase "
+        "of p + q tau, pulling with |p + q tau|.  So when three of them meet, the "
+        "angles are fixed by the charges and the coupling, and the junction holds still "
+        "only because the charges sum to zero.  Nothing about the geometry is imposed; "
+        "the balance is what comes out.",
+    )
+    suggestions = (
+        "Drag the coupling from one end to the other.  The blue (1,0) line is flat and "
+        "the orange (0,1) line falls like 1/g_s; they cross at g_s = 1, and which "
+        "string is the heavy one changes there.",
+        "Set the charges to (1,0) and read the S row: the fundamental string becomes "
+        "(0,1), the D1.  Set them to (0,1) and it comes back as (-1,0).  The sign is "
+        "the orientation.",
+        "Set (p, q) to (2, 2).  The binding energy drops to zero: a charge with a "
+        "common factor is two (1,1) strings sitting at threshold rather than one bound "
+        "object, and the readout says 'several at threshold' instead of 'a single "
+        "string'.",
+        "Move the axion off zero.  The junction's arms swing round, the net force stays "
+        "at zero, and the line comparing the D1 against dp_brane_tension stops claiming "
+        "an equality that only holds at C_0 = 0.",
+    )
     controls = (
         Slider("coupling", "string coupling  g_s", 0.05, 5.0, 0.5, step=0.01, log=True),
         Slider("axion", "axion  C_0", -1.5, 1.5, 0.0, step=0.01),
@@ -245,6 +285,70 @@ class PQPanel:
                 )
             )
         return lines
+
+
+    def notes(self, result: PQStrings) -> list[str]:
+        """Which string is heavy here, and what the coupling is doing to it."""
+        out: list[str] = []
+        if result.coupling < 1.0 - 1e-9:
+            out.append(
+                f"At g_s = {result.coupling:.3g} the theory is weakly coupled and the "
+                "D1-brane is the heavy object -- its tension goes like 1/g_s while the "
+                "fundamental string's does not.  This is the regime where calling the "
+                "fundamental string 'the' string is harmless."
+            )
+        elif result.coupling > 1.0 + 1e-9:
+            out.append(
+                f"At g_s = {result.coupling:.3g} the D1-brane is the lighter object of the two.  "
+                "Nothing distinguishes it as a brane rather than a string any more, and "
+                "an S transformation relabels the strongly coupled theory as a weakly "
+                "coupled one with the two swapped.  Which object is fundamental is a "
+                "question about the coupling, not about the theory."
+            )
+        else:
+            out.append(
+                "g_s = 1 is the fixed point of S.  The fundamental string and the "
+                "D1-brane have exactly the same tension here, and no measurement "
+                "distinguishes them."
+            )
+
+        if result.primitive:
+            out.append(
+                f"({result.p}, {result.q}) has coprime charges, so it is a single bound "
+                f"string.  It is lighter than its constituents by {result.binding:.4f} "
+                "-- the triangle inequality, since p and q tau point in different "
+                "directions -- and that deficit is the binding energy."
+            )
+        else:
+            out.append(
+                f"({result.p}, {result.q}) has a common factor, so it is not one object "
+                "but several copies of the primitive string sitting exactly at "
+                "threshold.  Its binding energy against them is zero, which is what the "
+                "readout reports rather than comparing it against (1,0) and (0,1) and "
+                "claiming a spurious binding."
+            )
+
+        out.append(
+            f"tau = {result.tau.real:+.4f} {result.tau.imag:+.4f}i sits "
+            + (
+                "already inside the fundamental domain of SL(2,Z)"
+                if result.reduction_steps == 0
+                else f"outside the fundamental domain; {result.reduction_steps} step(s) "
+                f"of SL(2,Z) walk it to {result.reduced.real:+.4f} "
+                f"{result.reduced.imag:+.4f}i"
+            )
+            + ".  Inequivalent type IIB vacua are labelled by that domain, and the "
+            "reduction reuses the very function that finds it for the one-loop "
+            "worldsheet -- the same group, a different tau."
+        )
+        out.append(
+            "The junction on the right is drawn from the charges alone.  Each arm "
+            "leaves along the phase of p + q tau with a length set by its tension, and "
+            f"the sum of those vectors is {result.junction_force:.1e}.  Move the "
+            "coupling and the arms swing; the sum does not move off zero, because "
+            "(1,0) + (0,1) + (-1,-1) = (0,0) and nothing else was ever required."
+        )
+        return out
 
 
 def _charges(charges: tuple[tuple[int, int], ...]) -> str:
